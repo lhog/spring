@@ -123,15 +123,17 @@ void SMFRenderStateGLSL::Update(
 			// both are runtime set in ::Enable, but ATI drivers need values from the beginning
 			glslShaders[n]->SetFlag("HAVE_SHADOWS", false);
 			glslShaders[n]->SetFlag("HAVE_INFOTEX", false);
+			glslShaders[n]->SetFlag("SOFT_SHADOWS", false);
 
 			// used to strip down the shader for the deferred pass
 			glslShaders[n]->SetFlag("DEFERRED_MODE", (n != GLSL_SHADER_STANDARD));
-			glslShaders[n]->SetFlag("GBUFFER_NORMTEX_IDX", GL::GeometryBuffer::ATTACHMENT_NORMTEX);
-			glslShaders[n]->SetFlag("GBUFFER_DIFFTEX_IDX", GL::GeometryBuffer::ATTACHMENT_DIFFTEX);
-			glslShaders[n]->SetFlag("GBUFFER_SPECTEX_IDX", GL::GeometryBuffer::ATTACHMENT_SPECTEX);
-			glslShaders[n]->SetFlag("GBUFFER_EMITTEX_IDX", GL::GeometryBuffer::ATTACHMENT_EMITTEX);
-			glslShaders[n]->SetFlag("GBUFFER_MISCTEX_IDX", GL::GeometryBuffer::ATTACHMENT_MISCTEX);
-			glslShaders[n]->SetFlag("GBUFFER_ZVALTEX_IDX", GL::GeometryBuffer::ATTACHMENT_ZVALTEX);
+			glslShaders[n]->SetFlag("GBUFFER_NORMTEX_IDX",  GL::GeometryBuffer::ATTACHMENT_NORMTEX );
+			glslShaders[n]->SetFlag("GBUFFER_DIFFTEX_IDX",  GL::GeometryBuffer::ATTACHMENT_DIFFTEX );
+			glslShaders[n]->SetFlag("GBUFFER_SPECTEX_IDX",  GL::GeometryBuffer::ATTACHMENT_SPECTEX );
+			glslShaders[n]->SetFlag("GBUFFER_EMITTEX_IDX",  GL::GeometryBuffer::ATTACHMENT_EMITTEX );
+			glslShaders[n]->SetFlag("GBUFFER_MISCTEX_IDX",  GL::GeometryBuffer::ATTACHMENT_MISCTEX );
+			glslShaders[n]->SetFlag("GBUFFER_MISCTEX2_IDX", GL::GeometryBuffer::ATTACHMENT_MISCTEX2);
+			glslShaders[n]->SetFlag("GBUFFER_ZVALTEX_IDX",  GL::GeometryBuffer::ATTACHMENT_ZVALTEX );
 
 			glslShaders[n]->Link();
 			glslShaders[n]->Enable();
@@ -140,6 +142,7 @@ void SMFRenderStateGLSL::Update(
 			glslShaders[n]->SetUniform("diffuseTex",             0);
 			glslShaders[n]->SetUniform("detailTex",              2);
 			glslShaders[n]->SetUniform("shadowTex",              4);
+			glslShaders[n]->SetUniform("shadowTexDepth",		 4);
 			glslShaders[n]->SetUniform("normalsTex",             5);
 			glslShaders[n]->SetUniform("specularTex",            6);
 			glslShaders[n]->SetUniform("splatDetailTex",         7);
@@ -154,6 +157,7 @@ void SMFRenderStateGLSL::Update(
 			glslShaders[n]->SetUniform("splatDetailNormalTex2", 16);
 			glslShaders[n]->SetUniform("splatDetailNormalTex3", 17);
 			glslShaders[n]->SetUniform("splatDetailNormalTex4", 18);
+			glslShaders[n]->SetUniform("softShadowEval",		19);
 
 			glslShaders[n]->SetUniform("mapSizePO2", mapDims.pwr2mapx * SQUARE_SIZE * 1.0f, mapDims.pwr2mapy * SQUARE_SIZE * 1.0f);
 			glslShaders[n]->SetUniform("mapSize",    mapDims.mapx     * SQUARE_SIZE * 1.0f, mapDims.mapy     * SQUARE_SIZE * 1.0f);
@@ -246,6 +250,7 @@ void SMFRenderStateGLSL::Enable(const CSMFGroundDrawer* smfGroundDrawer, const D
 
 	shader->SetFlag("HAVE_SHADOWS", shadowHandler.ShadowsLoaded());
 	shader->SetFlag("HAVE_INFOTEX", infoTextureHandler->IsEnabled());
+	shader->SetFlag("SOFT_SHADOWS", smfGroundDrawer->GetDoSoftShadows());
 
 	shader->Enable();
 	shader->SetUniform2v<float>("mapHeights", &mapParams.x);

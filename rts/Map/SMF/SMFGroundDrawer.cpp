@@ -43,6 +43,13 @@ CONFIG(int, MaxDynamicMapLights)
 
 CONFIG(bool, AllowDeferredMapRendering).defaultValue(false).safemodeValue(false);
 
+CONFIG(int, SoftShadows)
+	.defaultValue(2)
+	.headlessValue(0)
+	.safemodeValue(0)
+	.minimumValue(0)
+	.maximumValue(3)
+	.description("Enables soft occluder-occludee distance dependent terrain shadows. Requires AllowDeferredMapRendering = 1. Soft shadows quality level (0 - disabled, 1 - low, 2 - medium, 3 - high)");
 
 CONFIG(int, ROAM)
 	.defaultValue(1)
@@ -58,6 +65,7 @@ CSMFGroundDrawer::CSMFGroundDrawer(CSMFReadMap* rm)
 {
 	drawerMode = (configHandler->GetInt("ROAM") != 0)? SMF_MESHDRAWER_ROAM: SMF_MESHDRAWER_BASIC;
 	groundDetail = configHandler->GetInt("GroundDetail");
+	softShadows = configHandler->GetInt("SoftShadows");
 
 	groundTextures = new CSMFGroundTextures(smfMap);
 	meshDrawer = SwitchMeshDrawer(drawerMode);
@@ -324,6 +332,14 @@ bool CSMFGroundDrawer::HaveLuaRenderState() const
 }
 
 
+void CSMFGroundDrawer::ProduceSoftShadow(const DrawPass::e& drawPass)
+{
+	if (drawPass != DrawPass::e::TerrainDeferred)
+		return;
+
+
+}
+
 
 void CSMFGroundDrawer::DrawDeferredPass(const DrawPass::e& drawPass, bool alphaTest)
 {
@@ -436,6 +452,9 @@ void CSMFGroundDrawer::Draw(const DrawPass::e& drawPass)
 	// the entire map deferred
 	if (drawDeferred)
 		DrawDeferredPass(drawPass, mapRendering->voidGround || (mapRendering->voidWater && drawPass != DrawPass::WaterReflection));
+
+	if (shadowHandler.ShadowsLoaded() && softShadows > 0)
+		ProduceSoftShadow(drawPass);
 
 	if (drawForward)
 		DrawForwardPass(drawPass, mapRendering->voidGround || (mapRendering->voidWater && drawPass != DrawPass::WaterReflection));

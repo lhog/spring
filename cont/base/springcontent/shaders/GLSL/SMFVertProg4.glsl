@@ -13,12 +13,16 @@ uniform mat4 viewMat;
 uniform mat4 viewMatInv;
 uniform mat4 viewProjMat;
 
+#ifdef HAVE_SHADOWS
+	uniform mat4 shadowMat;
+#endif
 
 layout(location = 0) in vec3 vertexPosAttr;
 
 out vec3 halfDir;
 out vec4 vertexPos;
 out vec2 diffuseTexCoords;
+out vec4 vertexShadowPos;
 
 out float gl_ClipDistance[SMF_CLIP_PLANE_IDX + 1];
 out float fogFactor;
@@ -33,6 +37,8 @@ void main() {
 
 	vertexPos = vec4(vertexPosAttr, 1.0);
 	diffuseTexCoords = (floor(vertexPos.xz) / SMF_TEXSQR_SIZE) - texSquare.xy;
+
+	vertexShadowPos = shadowMat * vertexPos;
 
 	gl_Position = viewProjMat * vertexPos;
 	gl_ClipDistance[SMF_CLIP_PLANE_IDX] = dot(clipPlane, vertexPos);

@@ -37,6 +37,8 @@ public:
 	void DrawForwardPass(const DrawPass::e& drawPass, bool alphaTest);
 	void DrawShadowPass();
 
+	void ProduceSoftShadow(const DrawPass::e& drawPass);
+
 	void Update();
 	void UpdateRenderState();
 	void SunChanged();
@@ -50,6 +52,7 @@ public:
 
 	void SetupBigSquare(const int bigSquareX, const int bigSquareY);
 
+	bool GetDoSoftShadows() const { return softShadows > 0; }
 
 	void IncreaseDetail() { SetDetail(groundDetail + 1); }
 	void DecreaseDetail() { SetDetail(groundDetail - 1); }
@@ -84,6 +87,7 @@ protected:
 
 	int drawerMode;
 	int groundDetail;
+	int softShadows;
 
 	// [0] := no-op rendering path
 	// [1] := default shader-driven rendering path

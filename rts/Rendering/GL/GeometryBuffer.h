@@ -10,13 +10,14 @@ namespace GL {
 	struct GeometryBuffer {
 	public:
 		enum {
-			ATTACHMENT_NORMTEX = 0, // shading (not geometric) normals
-			ATTACHMENT_DIFFTEX = 1, // diffuse texture fragments
-			ATTACHMENT_SPECTEX = 2, // specular texture fragments
-			ATTACHMENT_EMITTEX = 3, // emissive texture fragments
-			ATTACHMENT_MISCTEX = 4, // custom data for LuaObjectRendering shaders
-			ATTACHMENT_ZVALTEX = 5, // fragment depth-values (must be last)
-			ATTACHMENT_COUNT   = 6,
+			ATTACHMENT_NORMTEX  = 0, // shading (not geometric) normals
+			ATTACHMENT_DIFFTEX  = 1, // diffuse texture fragments
+			ATTACHMENT_SPECTEX  = 2, // specular texture fragments
+			ATTACHMENT_EMITTEX  = 3, // emissive texture fragments
+			ATTACHMENT_MISCTEX  = 4, // custom data for LuaObjectRendering shaders
+			ATTACHMENT_MISCTEX2 = 5, // custom data for LuaObjectRendering shaders, R,G channels are occupied by soft-shadow in case it's active
+			ATTACHMENT_ZVALTEX  = 6, // fragment depth-values (must be last)
+			ATTACHMENT_COUNT    = 7,
 		};
 
 		GeometryBuffer(): name(nullptr), dead(false), bound(false) { Init(true); }

@@ -51,8 +51,9 @@ uniform ivec4 texSquare;
 
 #ifdef HAVE_SHADOWS
 	uniform sampler2DShadow shadowTex;
-	uniform mat4 shadowMat;
-	uniform vec4 shadowParams;
+	#ifdef SOFT_SHADOWS	
+		uniform sampler2D shadowTexDepth;
+	#endif
 #endif
 
 #ifdef SMF_WATER_ABSORPTION
@@ -99,6 +100,7 @@ uniform ivec4 texSquare;
 in vec3 halfDir;
 in vec4 vertexPos;
 in vec2 diffuseTexCoords;
+in vec4 vertexShadowPos;
 
 in float fogFactor;
 
@@ -421,13 +423,16 @@ void main() {
 
 	float shadowCoeff = 1.0;
 
-	#if (!defined(DEFERRED_MODE) && defined(HAVE_SHADOWS))
-	{
-		vec4 vertexShadowPos = shadowMat * vertexPos;
-
-		// shadowCoeff = 1 - (1 - shadowCoeff) * groundShadowDensity
-		shadowCoeff = mix(1.0, textureProj(shadowTex, vertexShadowPos), groundShadowDensity);
-	}
+	#ifdef HAVE_SHADOWS
+		#if (!defined(DEFERRED_MODE) && !defined(SOFT_SHADOWS))
+		{
+			shadowCoeff = mix(1.0, textureProj(shadowTex, vertexShadowPos), groundShadowDensity);
+		}
+		#endif
+		
+		#if (defined(DEFERRED_MODE) && defined(SOFT_SHADOWS))
+			float 
+		#endif		
 	#endif
 
 	#ifndef DEFERRED_MODE
@@ -469,9 +474,9 @@ void main() {
 	#ifndef DEFERRED_MODE
 		// sun specular lighting contribution
 		#ifdef SMF_SPECULAR_LIGHTING
-		float specularExp = specularColor.a * 16.0;
+			float specularExp = specularColor.a * 16.0;
 		#else
-		float specularExp = groundSpecularExponent;
+			float specularExp = groundSpecularExponent;
 		#endif
 		float specularPow = max(0.0, pow(cosAngleSpecular, specularExp));
 
@@ -482,14 +487,15 @@ void main() {
 
 
 	#ifdef DEFERRED_MODE
-	fragData[GBUFFER_NORMTEX_IDX] = vec4((normalVec + vec3(1.0, 1.0, 1.0)) * 0.5, 1.0);
-	fragData[GBUFFER_DIFFTEX_IDX] = diffuseColor + detailColor;
-	fragData[GBUFFER_SPECTEX_IDX] = specularColor;
-	fragData[GBUFFER_EMITTEX_IDX] = emissionColor;
-	fragData[GBUFFER_MISCTEX_IDX] = vec4(0.0, 0.0, 0.0, 0.0);
+		fragData[GBUFFER_NORMTEX_IDX] = vec4((normalVec + vec3(1.0, 1.0, 1.0)) * 0.5, 1.0);
+		fragData[GBUFFER_DIFFTEX_IDX] = diffuseColor + detailColor;
+		fragData[GBUFFER_SPECTEX_IDX] = specularColor;
+		fragData[GBUFFER_EMITTEX_IDX] = emissionColor;
+		fragData[GBUFFER_MISCTEX_IDX] = vec4(0.0, 0.0, 0.0, 0.0);
+		fragData[GBUFFER_MISCTEX2_IDX] =
 	#else
-	fragColor.rgb = mix(fogColor.rgb, fragColor.rgb, fogFactor);
-	fragColor.rgb = pow(fragColor.rgb, vec3(gammaExponent));
+		fragColor.rgb = mix(fogColor.rgb, fragColor.rgb, fogFactor);
+		fragColor.rgb = pow(fragColor.rgb, vec3(gammaExponent));
 	#endif
 }
 
