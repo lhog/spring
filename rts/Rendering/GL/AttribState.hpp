@@ -26,6 +26,7 @@ namespace GL {
 		void EnablePolyOfsFill();
 		void EnablePolyOfsPoint();
 		void EnablePolyOfsLine();
+		void EnableSampleShading();
 
 		void DisableDepthMask  ();
 		void DisableDepthClamp ();
@@ -38,6 +39,7 @@ namespace GL {
 		void DisablePolyOfsFill();
 		void DisablePolyOfsPoint();
 		void DisablePolyOfsLine();
+		void DisableSampleShading();
 
 
 		void PushAllBits();
@@ -171,6 +173,12 @@ namespace GL {
 		void PushPolygonOffsetLine() { PushPolygonOffsetLine(pofsFlagStack[2].Top()); }
 		void PopPolygonOffsetLine();
 		#endif
+
+		// Sample shading
+		void SampleShading(bool enable);
+		void PushSampleShading(bool enable);
+		void PushSampleShading() { PushSampleShading(scissorTestStack.Top()); }
+		void PopSampleShading();
 
 		// viewport (GLint)
 		void ViewPort(int32_t x, int32_t y, int32_t w, int32_t h);
@@ -360,6 +368,7 @@ namespace GL {
 		ArrayStack<PolyModeState   , 64>    polyModeStack;
 		ArrayStack<PolyOffsetState , 64>    pofsCtrlStack;
 		ArrayStack<bool            , 64>    pofsFlagStack[3];
+		ArrayStack<bool            , 64>    smshFlagStack;
 		ArrayStack<uint32_t        , 64>   frontFaceStack;
 		ArrayStack<uint32_t        , 64>    cullFaceStack;
 		ArrayStack<bool            , 64>    cullFlagStack;

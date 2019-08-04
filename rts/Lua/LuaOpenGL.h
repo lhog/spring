@@ -176,6 +176,7 @@ class LuaOpenGL {
 		static int BlendFunc(lua_State* L);
 		static int BlendEquationSeparate(lua_State* L);
 		static int BlendFuncSeparate(lua_State* L);
+		static int SampleShading(lua_State* L);
 
 		static int Color(lua_State* L);
 

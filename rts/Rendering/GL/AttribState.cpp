@@ -65,6 +65,7 @@ GL::AttribState::AttribState() {
 	stencilOperStack.Fill({GL_INVALID_ENUM, GL_INVALID_ENUM, GL_INVALID_ENUM});
 	polyModeStack.Fill({GL_INVALID_ENUM, GL_INVALID_ENUM});
 	pofsCtrlStack.Fill({0.0f, 0.0f});
+	smshFlagStack.Fill(GL_FALSE);
 	pofsFlagStack[0].Fill(GL_FALSE);
 	pofsFlagStack[1].Fill(GL_FALSE);
 	pofsFlagStack[2].Fill(GL_FALSE);
@@ -150,29 +151,31 @@ void GL::AttribState::Disable(uint32_t attrib) {
 }
 
 
-void GL::AttribState::EnableDepthMask   () {          DepthMask(GL_TRUE); }
-void GL::AttribState::EnableDepthClamp  () {         DepthClamp(GL_TRUE); }
-void GL::AttribState::EnableDepthTest   () {          DepthTest(GL_TRUE); }
-void GL::AttribState::EnableAlphaTest   () {          AlphaTest(GL_TRUE); }
-void GL::AttribState::EnableBlendMask   () {          BlendMask(GL_TRUE); }
-void GL::AttribState::EnableScissorTest () {        ScissorTest(GL_TRUE); }
-void GL::AttribState::EnableStencilTest () {        StencilTest(GL_TRUE); }
-void GL::AttribState::EnableCullFace    () {           CullFlag(GL_TRUE); }
-void GL::AttribState::EnablePolyOfsFill () { PolygonOffsetFill (GL_TRUE); }
-void GL::AttribState::EnablePolyOfsPoint() { PolygonOffsetPoint(GL_TRUE); }
-void GL::AttribState::EnablePolyOfsLine () { PolygonOffsetLine (GL_TRUE); }
+void GL::AttribState::EnableDepthMask    () {          DepthMask(GL_TRUE); }
+void GL::AttribState::EnableDepthClamp   () {         DepthClamp(GL_TRUE); }
+void GL::AttribState::EnableDepthTest    () {          DepthTest(GL_TRUE); }
+void GL::AttribState::EnableAlphaTest    () {          AlphaTest(GL_TRUE); }
+void GL::AttribState::EnableBlendMask    () {          BlendMask(GL_TRUE); }
+void GL::AttribState::EnableScissorTest  () {        ScissorTest(GL_TRUE); }
+void GL::AttribState::EnableStencilTest  () {        StencilTest(GL_TRUE); }
+void GL::AttribState::EnableCullFace     () {           CullFlag(GL_TRUE); }
+void GL::AttribState::EnablePolyOfsFill  () { PolygonOffsetFill (GL_TRUE); }
+void GL::AttribState::EnablePolyOfsPoint () { PolygonOffsetPoint(GL_TRUE); }
+void GL::AttribState::EnablePolyOfsLine  () { PolygonOffsetLine (GL_TRUE); }
+void GL::AttribState::EnableSampleShading() {      SampleShading(GL_TRUE); }
 
-void GL::AttribState::DisableDepthMask   () {          DepthMask(GL_FALSE); }
-void GL::AttribState::DisableDepthClamp  () {         DepthClamp(GL_FALSE); }
-void GL::AttribState::DisableDepthTest   () {          DepthTest(GL_FALSE); }
-void GL::AttribState::DisableAlphaTest   () {          AlphaTest(GL_FALSE); }
-void GL::AttribState::DisableBlendMask   () {          BlendMask(GL_FALSE); }
-void GL::AttribState::DisableScissorTest () {        ScissorTest(GL_FALSE); }
-void GL::AttribState::DisableStencilTest () {        StencilTest(GL_FALSE); }
-void GL::AttribState::DisableCullFace    () {           CullFlag(GL_FALSE); }
-void GL::AttribState::DisablePolyOfsFill () { PolygonOffsetFill (GL_FALSE); }
-void GL::AttribState::DisablePolyOfsPoint() { PolygonOffsetPoint(GL_FALSE); }
-void GL::AttribState::DisablePolyOfsLine () { PolygonOffsetLine (GL_FALSE); }
+void GL::AttribState::DisableDepthMask    () {          DepthMask(GL_FALSE); }
+void GL::AttribState::DisableDepthClamp   () {         DepthClamp(GL_FALSE); }
+void GL::AttribState::DisableDepthTest    () {          DepthTest(GL_FALSE); }
+void GL::AttribState::DisableAlphaTest    () {          AlphaTest(GL_FALSE); }
+void GL::AttribState::DisableBlendMask    () {          BlendMask(GL_FALSE); }
+void GL::AttribState::DisableScissorTest  () {        ScissorTest(GL_FALSE); }
+void GL::AttribState::DisableStencilTest  () {        StencilTest(GL_FALSE); }
+void GL::AttribState::DisableCullFace     () {           CullFlag(GL_FALSE); }
+void GL::AttribState::DisablePolyOfsFill  () { PolygonOffsetFill (GL_FALSE); }
+void GL::AttribState::DisablePolyOfsPoint () { PolygonOffsetPoint(GL_FALSE); }
+void GL::AttribState::DisablePolyOfsLine  () { PolygonOffsetLine (GL_FALSE); }
+void GL::AttribState::DisableSampleShading() {      SampleShading(GL_FALSE); }
 
 
 void GL::AttribState::PushAllBits() { PushBits(GL_ALL_ATTRIB_BITS); }
@@ -580,6 +583,16 @@ void GL::AttribState::PushPolygonOffsetLine(bool enable) {
 }
 void GL::AttribState::PopPolygonOffsetLine() {
 	glSetStateFuncs[pofsFlagStack[2].Pop(true)](GL_POLYGON_OFFSET_LINE);
+}
+
+void GL::AttribState::SampleShading(bool enable) {
+	glSetStateFuncs[smshFlagStack.Top() = enable](GL_SAMPLE_SHADING);
+}
+void GL::AttribState::PushSampleShading(bool enable) {
+	glSetStateFuncs[smshFlagStack.Push(enable)](GL_SAMPLE_SHADING);
+}
+void GL::AttribState::PopSampleShading() {
+	glSetStateFuncs[smshFlagStack.Pop(true)](GL_SAMPLE_SHADING);
 }
 
 

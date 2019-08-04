@@ -247,6 +247,7 @@ bool LuaOpenGL::PushEntries(lua_State* L)
 	REGISTER_LUA_CFUNC(BlendFunc);
 	REGISTER_LUA_CFUNC(BlendEquationSeparate);
 	REGISTER_LUA_CFUNC(BlendFuncSeparate);
+	REGISTER_LUA_CFUNC(SampleShading);
 
 	REGISTER_LUA_CFUNC(PolygonMode);
 	REGISTER_LUA_CFUNC(PolygonOffset);
@@ -2117,6 +2118,23 @@ int LuaOpenGL::BlendFuncSeparate(lua_State* L)
 	return 0;
 }
 
+int LuaOpenGL::SampleShading(lua_State* L)
+{
+	CheckDrawingEnabled(L, __func__);
+	if (lua_isboolean(L, 1)) {
+		if (lua_toboolean(L, 1)) {
+			//glAttribStatePtr->EnableBlendMask();
+		}
+		else {
+			//glAttribStatePtr->DisableBlendMask();
+		}
+	}
+	else if (lua_isnumber(L, 1)) {
+		glMinSampleShading((GLfloat)luaL_checkfloat(L, 1));
+	}
+
+	return 0;
+}
 
 
 int LuaOpenGL::PolygonMode(lua_State* L)
