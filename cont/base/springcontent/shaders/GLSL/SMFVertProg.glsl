@@ -1,33 +1,38 @@
 #version 130
 
+#define TESSELATION_RENDERING
+
 #define SMF_TEXSQR_SIZE 1024.0
 #define SMF_DETAILTEX_RES 0.02
 
 uniform ivec2 texSquare;
+
 uniform vec3 cameraPos;
 uniform vec4 lightDir;       // mapInfo->light.sunDir
 
-varying vec3 halfDir;
-varying float fogFactor;
-varying vec4 vertexWorldPos;
-varying vec2 diffuseTexCoords;
-
+out vec3 halfDir;
+out float fogFactor;
+out vec4 vertexWorldPos;
+out vec2 diffuseTexCoords;
 
 void main() {
 	// calc some lighting variables
 	vec3 viewDir = vec3(gl_ModelViewMatrixInverse * vec4(0.0, 0.0, 0.0, 1.0));
 
-	viewDir = normalize(viewDir - gl_Vertex.xyz);
-	halfDir = normalize(lightDir.xyz + viewDir);
-
 	vertexWorldPos = gl_Vertex;
+#ifdef TESSELATION_RENDERING
+	vertexWorldPos.xz += SMF_TEXSQR_SIZE * texSquare;
+#endif
+
+	viewDir = normalize(viewDir - vertexWorldPos.xyz);
+	halfDir = normalize(lightDir.xyz + viewDir);
 
 	// calc texcoords
 	diffuseTexCoords = (floor(vertexWorldPos.xz) / SMF_TEXSQR_SIZE) - vec2(texSquare);
 
 	// transform vertex pos
-	gl_Position = gl_ModelViewProjectionMatrix * gl_Vertex;
-	gl_ClipVertex = gl_ModelViewMatrix * gl_Vertex;
+	gl_Position = gl_ModelViewProjectionMatrix * vertexWorldPos;
+	gl_ClipVertex = gl_ModelViewMatrix * vertexWorldPos;
 
 #ifndef DEFERRED_MODE
 	// emulate linear fog
@@ -36,4 +41,3 @@ void main() {
 	fogFactor = clamp(fogFactor, 0.0, 1.0);
 #endif
 }
-

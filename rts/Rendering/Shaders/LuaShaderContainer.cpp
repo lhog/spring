@@ -176,18 +176,24 @@ bool LoadFromLua(Shader::IProgramObject* program, const std::string& filename)
 
 	std::stringstream shdrDefs;
 	std::stringstream vertSrcs;
+	std::stringstream tcsSrcs;
+	std::stringstream tesSrcs;
 	std::stringstream geomSrcs;
 	std::stringstream fragSrcs;
 
 	ParseShaderTable(&root, "definitions", shdrDefs);
-	ParseShaderTable(&root, "vertex",   vertSrcs);
-	ParseShaderTable(&root, "geometry", geomSrcs);
-	ParseShaderTable(&root, "fragment", fragSrcs);
+	ParseShaderTable(&root, "vertex",      vertSrcs);
+	ParseShaderTable(&root, "tcs",         tcsSrcs);
+	ParseShaderTable(&root, "tes",         tesSrcs);
+	ParseShaderTable(&root, "geometry",    geomSrcs);
+	ParseShaderTable(&root, "fragment",    fragSrcs);
 
-	if (vertSrcs.str().empty() && fragSrcs.str().empty() && geomSrcs.str().empty())
+	if (vertSrcs.str().empty() && fragSrcs.str().empty() && tcsSrcs.str().empty() && tesSrcs.str().empty() && geomSrcs.str().empty())
 		return false;
 
 	CreateShaderObject(program, shdrDefs.str(), vertSrcs.str(), GL_VERTEX_SHADER);
+	CreateShaderObject(program, shdrDefs.str(), tcsSrcs.str(),  GL_TESS_CONTROL_SHADER);
+	CreateShaderObject(program, shdrDefs.str(), tesSrcs.str(),  GL_TESS_EVALUATION_SHADER);
 	CreateShaderObject(program, shdrDefs.str(), geomSrcs.str(), GL_GEOMETRY_SHADER_EXT);
 	CreateShaderObject(program, shdrDefs.str(), fragSrcs.str(), GL_FRAGMENT_SHADER);
 

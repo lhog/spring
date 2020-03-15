@@ -130,6 +130,7 @@ CR_REG_METADATA(CGlobalRendering, (
 	CR_IGNORED(atiHacks),
 	CR_IGNORED(supportNonPowerOfTwoTex),
 	CR_IGNORED(supportTextureQueryLOD),
+	CR_IGNORED(supportTesselation),
 	CR_IGNORED(supportMSAAFrameBuffer),
 	CR_IGNORED(support24bitDepthBuffer),
 	CR_IGNORED(supportRestartPrimitive),
@@ -226,6 +227,7 @@ CGlobalRendering::CGlobalRendering()
 
 	, supportNonPowerOfTwoTex(false)
 	, supportTextureQueryLOD(false)
+	, supportTesselation(false)
 	, supportMSAAFrameBuffer(false)
 	, support24bitDepthBuffer(false)
 	, supportRestartPrimitive(false)
@@ -635,6 +637,8 @@ void CGlobalRendering::SetGLSupportFlags()
 	// ATI's x-series doesn't support NPOTs, hd-series does
 	supportNonPowerOfTwoTex = GLEW_ARB_texture_non_power_of_two && (!haveATI || (glRenderer.find(" x") == std::string::npos && glRenderer.find(" 9") == std::string::npos));
 	supportTextureQueryLOD = GLEW_ARB_texture_query_lod;
+
+	supportTesselation = glewIsSupported("GL_ARB_tessellation_shader");
 
 
 	for (size_t n = 0; (n < sizeof(globalRenderingInfo.glVersionShort) && globalRenderingInfo.glVersion[n] != 0); n++) {

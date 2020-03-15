@@ -235,6 +235,13 @@ public:
 	bool supportNonPowerOfTwoTex;
 	bool supportTextureQueryLOD;
 
+	/**
+	 * @brief GL_ARB_tessellation_shader
+	 *
+	 * Whether tesselation shaders are supported
+	 */
+	bool supportTesselation;
+
 	bool supportMSAAFrameBuffer;
 	/**
 	 * @brief support24bitDepthBuffer

@@ -17,15 +17,16 @@ namespace Shader {
 enum {
 	RENDER_STATE_FFP = 0, // fixed-function path
 	RENDER_STATE_SSP = 1, // standard-shader path (ARB/GLSL)
-	RENDER_STATE_LUA = 2, // Lua-shader path
-	RENDER_STATE_SEL = 3, // selected path
-	RENDER_STATE_CNT = 4,
+	RENDER_STATE_TSP = 2, // Tesselation-shader path (GLSL)
+	RENDER_STATE_LUA = 3, // Lua-shader path
+	RENDER_STATE_SEL = 4, // selected path
+	RENDER_STATE_CNT = 5,
 };
 
 
 struct ISMFRenderState {
 public:
-	static ISMFRenderState* GetInstance(bool haveARB, bool haveGLSL, bool luaShader);
+	static ISMFRenderState* GetInstance(bool haveARB, bool haveGLSL, bool needTess, bool luaShader);
 	static void FreeInstance(ISMFRenderState* state) { delete state; }
 
 	virtual ~ISMFRenderState() {}
@@ -117,7 +118,8 @@ private:
 
 struct SMFRenderStateGLSL: public ISMFRenderState {
 public:
-	SMFRenderStateGLSL(bool lua): useLuaShaders(lua) { glslShaders.fill(nullptr); }
+	SMFRenderStateGLSL(bool lua, bool tess):
+		useLuaShaders(lua), useTessPipeline(tess) { glslShaders.fill(nullptr); }
 	~SMFRenderStateGLSL() { glslShaders.fill(nullptr); }
 
 	bool Init(const CSMFGroundDrawer* smfGroundDrawer);
@@ -154,6 +156,9 @@ private:
 
 	// if true, shader programs for this state are Lua-defined
 	bool useLuaShaders;
+
+	// if true, modify pipeline to accomodate tesselation
+	bool useTessPipeline;
 };
 
 #endif

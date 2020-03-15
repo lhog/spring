@@ -10,6 +10,7 @@
 #include "Map/SMF/Basic/BasicMeshDrawer.h"
 #include "Map/SMF/Legacy/LegacyMeshDrawer.h"
 #include "Map/SMF/ROAM/RoamMeshDrawer.h"
+#include "Map/SMF/Tess/TessMeshDrawer.h"
 #include "Rendering/GlobalRendering.h"
 #include "Rendering/ShadowHandler.h"
 #include "Rendering/Env/ISky.h"
@@ -155,6 +156,15 @@ IMeshDrawer* CSMFGroundDrawer::SwitchMeshDrawer(int wantedMode)
 		case SMF_MESHDRAWER_BASIC: {
 			LOG("Switching to Basic Mesh Rendering");
 			meshDrawer = new CBasicMeshDrawer(this);
+		} break;
+		case SMF_MESHDRAWER_TESS: {
+			if (CTessMeshDrawer::Supported()) {
+				LOG("Switching to GPU Tesselation Mesh Rendering");
+				meshDrawer = new CTessMeshDrawer(this);
+			} else {
+				LOG("GPU Tesselation Mesh Rendering is not supported \n Switching to Basic Mesh Rendering");
+				meshDrawer = new CBasicMeshDrawer(this);
+			}
 		} break;
 		default: {
 			LOG("Switching to ROAM Mesh Rendering");

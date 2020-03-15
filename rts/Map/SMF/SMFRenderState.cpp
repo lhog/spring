@@ -25,7 +25,7 @@
 
 
 
-ISMFRenderState* ISMFRenderState::GetInstance(bool haveARB, bool haveGLSL, bool luaShaders) {
+ISMFRenderState* ISMFRenderState::GetInstance(bool haveARB, bool haveGLSL, bool needTess, bool luaShader) {
 	ISMFRenderState* instance = nullptr;
 
 	if (!haveARB && !haveGLSL) {
@@ -34,7 +34,7 @@ ISMFRenderState* ISMFRenderState::GetInstance(bool haveARB, bool haveGLSL, bool 
 		if (!haveGLSL) {
 			instance = new SMFRenderStateARB();
 		} else {
-			instance = new SMFRenderStateGLSL(luaShaders);
+			instance = new SMFRenderStateGLSL(luaShaders, needTess);
 		}
 	}
 
