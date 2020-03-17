@@ -242,6 +242,13 @@ public:
 	 */
 	bool supportTesselation;
 
+	/**
+	 * @brief ARB_transform_feedback3
+	 *
+	 * Whether transfortm feedback is supported
+	 */
+	bool supportTransformFB;
+
 	bool supportMSAAFrameBuffer;
 	/**
 	 * @brief support24bitDepthBuffer

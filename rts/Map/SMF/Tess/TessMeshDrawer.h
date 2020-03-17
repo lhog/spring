@@ -9,6 +9,9 @@
 #include "Map/SMF/IMeshDrawer.h"
 #include "System/EventHandler.h"
 
+#include "Rendering/GlobalRendering.h"
+#include "Rendering/GL/myGL.h"
+
 
 
 class CSMFGroundDrawer;
@@ -35,8 +38,16 @@ public:
 	void DrawBorderMesh(const DrawPass::e& drawPass);
 
 public:
-	static bool Supported() { return globalRendering->supportTesselation; }
+	static bool Supported() { return globalRendering->supportTesselation && globalRendering->supportTransformFB; }
 
+private:
+	struct PatchObjects {
+		GLuint tfbb;  //transform feedback buffer
+		GLuint tfbo;  //transform feedback object
+		GLuint tfbpw; //query object for GL_TRANSFORM_FEEDBACK_PRIMITIVES_WRITTEN
+	};
+private:
+	void CreateTransformFeedback(const std::vector<PatchObjects>& patchObjectBuffer);
 private:
 	enum {
 		MAP_BORDER_L     = 0,
@@ -45,7 +56,6 @@ private:
 		MAP_BORDER_B     = 3,
 		MAP_BORDER_COUNT = 4,
 	};
-
 private:
 	static constexpr int32_t PATCH_SIZE = 128; // must match SMFReadMap::bigSquareSize
 	static constexpr int32_t TESS_LEVEL = 64; // should be a power of two, less or equal than GL_MAX_TESS_GEN_LEVEL (64)
@@ -54,15 +64,23 @@ private:
 
 	static constexpr float VBO_DEFAULT_HEIGHT   = 100.0f; //used for debug purposes and overwritten by shader anyway
 
+	static constexpr int32_t BUFFER_NUM = 3; //triple buffering. TODO: check double
+
+	//tune me
+	static constexpr float camDistDiff = 3.0f;
+	static constexpr float camDirDiff = 0.99939f; // ~2 degrees difference
+
 private:
 	CSMFGroundDrawer* smfGroundDrawer;
 
-	bool instancingSupported;
+	float3 lastCamPos = ZeroVector;
+	float3 lastCamDir = FwdVector;
 
 	uint32_t numPatchesX;
 	uint32_t numPatchesY;
 
 	VBO squareVertexBuffer;
+	std::array< std::vector<PatchObjects>, BUFFER_NUM > patchObjectBuffers;
 
 	//std::array<VBO, MAP_BORDER_COUNT> borderVertexBuffers;
 };

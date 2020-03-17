@@ -41,8 +41,6 @@ CTessMeshDrawer::CTessMeshDrawer(CSMFGroundDrawer* gd)
 {
 	eventHandler.AddClient(this);
 
-	//can't do instancing anyway because diffuse texture is broken down into chunks
-	//instancingSupported = glewIsSupported("GL_ARB_draw_instanced");
 
 	numPatchesX = mapDims.mapx / PATCH_SIZE;
 	numPatchesY = mapDims.mapy / PATCH_SIZE;
@@ -50,8 +48,28 @@ CTessMeshDrawer::CTessMeshDrawer(CSMFGroundDrawer* gd)
 	assert(numPatchesX >= 1);
 	assert(numPatchesY >= 1);
 
+	// (number of quads per patch) * (number of quads a tesselation can produce per patch primitive/quad) * (triangles per quad)
+	uint32_t maxTrianglesPerPatch = (PATCH_RC_QUAD_NUM * PATCH_RC_QUAD_NUM) * (TESS_LEVEL * TESS_LEVEL) * 2;
+
+	for (auto& patchObjectBuffer : patchObjectBuffers) {
+		patchObjectBuffer.resize(numPatchesX * numPatchesY);
+		for (uint32_t i = 0; i < numPatchesX * numPatchesY; ++i) {
+			patchObjectBuffer[i] = PatchObjects{ 0, 0, 0 };
+			glGenTransformFeedbacks(1, &patchObjectBuffer[i].tfbo);
+			glBindTransformFeedback(GL_TRANSFORM_FEEDBACK, patchObjectBuffer[i].tfbo);
+
+			glGenQueries(1, &patchObjectBuffer[i].tfbpw);
+
+			glGenBuffers(1, &patchObjectBuffer[i].tfbb);
+			glBindBufferBase(GL_TRANSFORM_FEEDBACK_BUFFER, 0, patchObjectBuffer[i].tfbb);
+			glBufferData(GL_TRANSFORM_FEEDBACK_BUFFER, maxTrianglesPerPatch * sizeof(float3), 0, GL_DYNAMIC_COPY);
+
+			glBindTransformFeedback(GL_TRANSFORM_FEEDBACK, 0);
+		}
+	}
+
 	squareVertexBuffer.Bind(GL_ARRAY_BUFFER);
-	squareVertexBuffer.New(PATCH_VERT_NUM * sizeof(float3), GL_DYNAMIC_DRAW); //vec3 for vertex, no normals(?)
+	squareVertexBuffer.New(PATCH_VERT_NUM * sizeof(float3), GL_STATIC_DRAW); //vec3 for vertex, no normals(?)
 
 	auto patchVert = reinterpret_cast<float3*>(squareVertexBuffer.MapBuffer(GL_MAP_WRITE_BIT)); //don't bother with persistent buffer
 
@@ -65,9 +83,8 @@ CTessMeshDrawer::CTessMeshDrawer(CSMFGroundDrawer* gd)
 				patchVert[patchVertIdx++] = float3((i + 1) * SQUARE_SIZE * TESS_LEVEL, VBO_DEFAULT_HEIGHT, (j + 1) * SQUARE_SIZE * TESS_LEVEL); //BR
 				patchVert[patchVertIdx++] = float3((i + 1) * SQUARE_SIZE * TESS_LEVEL, VBO_DEFAULT_HEIGHT, (j + 0) * SQUARE_SIZE * TESS_LEVEL); //TR
 			}
+		assert(patchVertIdx == PATCH_VERT_NUM);
 	}
-
-	assert(patchVertIdx == patchVertIdx);
 
 	squareVertexBuffer.UnmapBuffer();
 	squareVertexBuffer.Unbind();
@@ -78,28 +95,80 @@ CTessMeshDrawer::CTessMeshDrawer(CSMFGroundDrawer* gd)
 CTessMeshDrawer::~CTessMeshDrawer()
 {
 	eventHandler.RemoveClient(this);
+
+	for (auto& patchObjectBuffer : patchObjectBuffers) {
+		patchObjectBuffer.resize(numPatchesX * numPatchesY);
+		for (uint32_t i = 0; i < numPatchesX * numPatchesY; ++i) {
+			glDeleteBuffers(1, &patchObjectBuffer[i].tfbb);
+			glDeleteQueries(1, &patchObjectBuffer[i].tfbpw);
+			glDeleteTransformFeedbacks(1, &patchObjectBuffer[i].tfbo);
+		}
+	}
+
+	// handled by destructor
+	//squareVertexBuffer.Delete();
 }
 
+void CTessMeshDrawer::CreateTransformFeedback(const std::vector<PatchObjects>& patchObjectBuffer) {
+	glEnable(GL_RASTERIZER_DISCARD);
+	glEnableClientState(GL_VERTEX_ARRAY);
+
+	for (uint32_t i = 0; i < numPatchesX * numPatchesY; ++i) {
+
+		squareVertexBuffer.Bind(GL_ARRAY_BUFFER);
+		assert(squareVertexBuffer.GetPtr() == nullptr);
+		glVertexPointer(3, GL_FLOAT, sizeof(float3), squareVertexBuffer.GetPtr());
+		squareVertexBuffer.Unbind();
+
+		glBeginQuery(GL_TRANSFORM_FEEDBACK_PRIMITIVES_WRITTEN, patchObjectBuffer[i].tfbpw);
+		glBeginTransformFeedback(GL_TRIANGLES);
+
+		glDrawArrays(GL_RENDERING_PRIMITIVE, 0, GL_PATCHES);
+
+		glEndTransformFeedback();
+		glEndQuery(GL_TRANSFORM_FEEDBACK_PRIMITIVES_WRITTEN);
+
+		GLuint numPrimitivesWritten = 0;
+		glGetQueryObjectuiv(patchObjectBuffer[i].tfbpw, GL_QUERY_RESULT, &numPrimitivesWritten); //in vertices?
+
+		LOG("CTessMeshDrawer CreateTransformFeedback patch[%d] wrote [%d] primitives", i, numPrimitivesWritten);
+	}
+
+	glDisableClientState(GL_VERTEX_ARRAY);
+	glDisable(GL_RASTERIZER_DISCARD);
+}
 
 void CTessMeshDrawer::DrawMesh(const DrawPass::e& drawPass)
 {
+	const auto& patchObjectBuffer = patchObjectBuffers[ globalRendering->drawFrame % CTessMeshDrawer::BUFFER_NUM ];
+
+	auto cam = CCameraHandler::GetCamera(CCamera::CAMTYPE_PLAYER);
+	auto camPos = cam->GetPos();
+	auto camDir = cam->GetDir();
+
+	if (lastCamPos.distance(camPos) > CTessMeshDrawer::camDistDiff ||
+		abs(lastCamDir.dot(camDir)) < CTessMeshDrawer::camDirDiff) {
+		lastCamPos = camPos;
+		lastCamDir = camDir;
+		//CreateTransformFeedback(patchObjectBuffer);
+	}
+
+	glEnableClientState(GL_VERTEX_ARRAY);
 	for (uint32_t py = 0; py < numPatchesY; ++py) {
 		for (uint32_t px = 0; px < numPatchesX; ++px) {
 
 			if (drawPass != DrawPass::Shadow)
 				smfGroundDrawer->SetupBigSquare(px, py);
 
-			glEnableClientState(GL_VERTEX_ARRAY);
 			squareVertexBuffer.Bind(GL_ARRAY_BUFFER);
 			assert(squareVertexBuffer.GetPtr() == nullptr);
 			glVertexPointer(3, GL_FLOAT, sizeof(float3), squareVertexBuffer.GetPtr());
 			squareVertexBuffer.Unbind();
 
 			glDrawArrays(GL_RENDERING_PRIMITIVE, 0, PATCH_VERT_NUM);
-
-			glDisableClientState(GL_VERTEX_ARRAY);
 		}
 	}
+	glDisableClientState(GL_VERTEX_ARRAY);
 }
 
 void CTessMeshDrawer::DrawBorderMesh(const DrawPass::e& drawPass)
