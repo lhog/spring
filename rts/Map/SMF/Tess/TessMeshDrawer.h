@@ -12,6 +12,7 @@
 #include "Rendering/GlobalRendering.h"
 #include "Rendering/GL/myGL.h"
 
+#include "TessMeshCommon.h"
 
 
 class CSMFGroundDrawer;
@@ -20,34 +21,22 @@ class CTessMeshDrawer : public IMeshDrawer, public CEventClient
 {
 public:
 	// CEventClient interface
-	bool WantsEvent(const std::string& eventName) {
-		return (eventName == "UnsyncedHeightMapUpdate") || (eventName == "DrawInMiniMap");
+	bool WantsEvent(const std::string& eventName) override {
+		return (eventName == "UnsyncedHeightMapUpdate") || (eventName == "Update");
 	}
-	bool GetFullRead() const { return true; }
-	int  GetReadAllyTeam() const { return AllAccessTeam; }
+	bool GetFullRead() const override { return true; }
+	int  GetReadAllyTeam() const override { return AllAccessTeam; }
 
-	void UnsyncedHeightMapUpdate(const SRectangle& rect);
-	void Update() {};
-	void DrawInMiniMap();
-
+	void UnsyncedHeightMapUpdate(const SRectangle& rect) override;
+	void Update() override;
 public:
 	CTessMeshDrawer(CSMFGroundDrawer* gd);
 	~CTessMeshDrawer();
 
-	void DrawMesh(const DrawPass::e& drawPass);
-	void DrawBorderMesh(const DrawPass::e& drawPass);
-
+	void DrawMesh(const DrawPass::e& drawPass) override;
+	void DrawBorderMesh(const DrawPass::e& drawPass) override;
 public:
-	static bool Supported() { return false; }
-
-private:
-	struct PatchObjects {
-		GLuint tfbb;  //transform feedback buffer
-		GLuint tfbo;  //transform feedback object
-		GLuint tfbpw; //query object for GL_TRANSFORM_FEEDBACK_PRIMITIVES_WRITTEN
-	};
-private:
-	void RunTransformFeedback(const std::vector<PatchObjects>& patchObjectBuffer);
+	static bool Supported();
 private:
 	enum {
 		MAP_BORDER_L     = 0,
@@ -57,32 +46,20 @@ private:
 		MAP_BORDER_COUNT = 4,
 	};
 private:
-	static constexpr int32_t PATCH_SIZE = 128; // must match SMFReadMap::bigSquareSize
-	static constexpr int32_t TESS_LEVEL = 64; // should be a power of two, less or equal than GL_MAX_TESS_GEN_LEVEL (64)
-	static constexpr int32_t PATCH_RC_QUAD_NUM  = PATCH_SIZE / TESS_LEVEL; // number of quads in one row/column of the patch
-	static constexpr int32_t PATCH_VERT_NUM     = 4 * PATCH_RC_QUAD_NUM * PATCH_RC_QUAD_NUM;  // number of vertices in whole patch
-
-	static constexpr float VBO_DEFAULT_HEIGHT   = 100.0f; //used for debug purposes and overwritten by shader anyway
-
-	static constexpr int32_t BUFFER_NUM = 3; //triple buffering. TODO: check double
-
 	//tune me
 	static constexpr float camDistDiff = 3.0f;
 	static constexpr float camDirDiff = 0.99939f; // ~2 degrees difference
 
 private:
-	CSMFGroundDrawer* smfGroundDrawer;
+	//CSMFGroundDrawer* smfGroundDrawer;
+
+	std::unique_ptr<CTessMeshCache> tessMeshCache;
 
 	float3 lastCamPos = ZeroVector;
 	float3 lastCamDir = FwdVector;
 
 	uint32_t numPatchesX;
-	uint32_t numPatchesY;
-
-	VBO squareVertexBuffer;
-	std::array< std::vector<PatchObjects>, BUFFER_NUM > patchObjectBuffers;
-
-	//std::array<VBO, MAP_BORDER_COUNT> borderVertexBuffers;
+	uint32_t numPatchesZ;
 };
 
 #endif // _TESS_MESH_DRAWER_H_

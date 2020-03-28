@@ -15,6 +15,7 @@
 #include "TessMeshShaders.h"
 
 struct TeshMessConsts {
+	static constexpr int32_t UHM_TO_MESH = 64.0f; // Divider to divide UHM rect coord by to get Patch{x,y}
 	static constexpr int32_t PATCH_SIZE = 128; // must match SMFReadMap::bigSquareSize
 	static constexpr int32_t TESS_LEVEL = 64; // should be a power of two, less or equal than GL_MAX_TESS_GEN_LEVEL (64)
 	static constexpr int32_t PATCH_RC_QUAD_NUM = PATCH_SIZE / TESS_LEVEL; // number of quads in one row/column of the patch
@@ -40,6 +41,9 @@ struct MeshTessTriangle {
 class CTessMeshCache
 {
 public:
+	CTessMeshCache(const int numPatchesX, const int numPatchesZ, const GLenum meshTessBufferType);
+	virtual ~CTessMeshCache();
+public:
 	static bool Supported() {
 		return
 			globalRendering->haveGLSL &&
@@ -51,8 +55,6 @@ public:
 			GLEW_ARB_shader_image_load_store; // for glMemoryBarrier()
 	};
 public:
-	virtual void Init(const int nPX, const int nPY, const GLenum meshTessBufferType);
-	virtual void Finalize();
 	virtual void Update() = 0;
 	virtual void RequestTesselation();
 	virtual void RequestTesselation(const int px, const int py);
@@ -62,11 +64,11 @@ private:
 	void FillMeshTemplateBuffer();
 protected:
 	int numPatchesX;
-	int numPatchesY;
+	int numPatchesZ;
 
 	std::vector<bool> tessMeshDirty;
 
-	ITessMeshShader tessMeshShader;
+	std::unique_ptr<CTessMeshShader> tessMeshShader;
 
 	std::unique_ptr<MeshPatches> meshTemplate;
 
@@ -78,17 +80,16 @@ protected:
 class CTessMeshCacheTF : public CTessMeshCache
 {
 public:
+	//, const GLenum meshTessBufferType = GL_TRANSFORM_FEEDBACK_BUFFER
+	CTessMeshCacheTF(const int numPatchesX, const int numPatchesZ);
+	virtual ~CTessMeshCacheTF();
+public:
 	static bool Supported() {
 		return CTessMeshCache::Supported() &&
 			GLEW_ARB_transform_feedback2;
 	};
 public:
-	CTessMeshCacheTF();
-	virtual ~CTessMeshCacheTF();
-public:
 	// Inherited via CTessMeshCache
-	virtual void Init(const int nPX, const int nPY, const GLenum meshTessBufferType = GL_TRANSFORM_FEEDBACK_BUFFER) override;
-	virtual void Finalize() override;
 	virtual void Update() override;
 	virtual void Reset() override;
 	virtual void DrawMesh(const int px, const int py) override;
@@ -105,12 +106,11 @@ public:
 			GLEW_ARB_shader_storage_buffer_object;
 	};
 public:
-	CTessMeshCacheSSBO();
+	//, const GLenum meshTessBufferType = GL_SHADER_STORAGE_BUFFER
+	CTessMeshCacheSSBO(const int numPatchesX, const int nPY);
 	virtual ~CTessMeshCacheSSBO();
 public:
 	// Inherited via CTessMeshCache
-	virtual void Init(const int nPX, const int nPY, const GLenum meshTessBufferType = GL_SHADER_STORAGE_BUFFER) override;
-	virtual void Finalize() override;
 	virtual void Update() override;
 	virtual void Reset() override;
 	virtual void DrawMesh(const int px, const int py) override;
