@@ -55,15 +55,17 @@ CTessMeshDrawer::CTessMeshDrawer(CSMFGroundDrawer* gd)
 		patchObjectBuffer.resize(numPatchesX * numPatchesY);
 		for (uint32_t i = 0; i < numPatchesX * numPatchesY; ++i) {
 			patchObjectBuffer[i] = PatchObjects{ 0, 0, 0 };
-			glGenTransformFeedbacks(1, &patchObjectBuffer[i].tfbo);
-			glBindTransformFeedback(GL_TRANSFORM_FEEDBACK, patchObjectBuffer[i].tfbo);
 
+			glGenTransformFeedbacks(1, &patchObjectBuffer[i].tfbo);
+			glGenBuffers(1, &patchObjectBuffer[i].tfbb);
 			glGenQueries(1, &patchObjectBuffer[i].tfbpw);
 
-			glGenBuffers(1, &patchObjectBuffer[i].tfbb);
-			glBindBufferBase(GL_TRANSFORM_FEEDBACK_BUFFER, 0, patchObjectBuffer[i].tfbb);
-			glBufferData(GL_TRANSFORM_FEEDBACK_BUFFER, maxTrianglesPerPatch * sizeof(float3), 0, GL_DYNAMIC_COPY);
-
+			glBindTransformFeedback(GL_TRANSFORM_FEEDBACK, patchObjectBuffer[i].tfbo);
+			{
+				glBindBuffer(GL_TRANSFORM_FEEDBACK_BUFFER, patchObjectBuffer[i].tfbb);
+				glBindBufferBase(GL_TRANSFORM_FEEDBACK_BUFFER, 0, patchObjectBuffer[i].tfbb);
+				glBufferData(GL_TRANSFORM_FEEDBACK_BUFFER, maxTrianglesPerPatch * sizeof(float3), 0, GL_DYNAMIC_COPY);
+			}
 			glBindTransformFeedback(GL_TRANSFORM_FEEDBACK, 0);
 		}
 	}
@@ -105,11 +107,13 @@ CTessMeshDrawer::~CTessMeshDrawer()
 		}
 	}
 
+
+
 	// handled by destructor
 	//squareVertexBuffer.Delete();
 }
 
-void CTessMeshDrawer::CreateTransformFeedback(const std::vector<PatchObjects>& patchObjectBuffer) {
+void CTessMeshDrawer::RunTransformFeedback(const std::vector<PatchObjects>& patchObjectBuffer) {
 	glEnable(GL_RASTERIZER_DISCARD);
 	glEnableClientState(GL_VERTEX_ARRAY);
 
@@ -120,13 +124,12 @@ void CTessMeshDrawer::CreateTransformFeedback(const std::vector<PatchObjects>& p
 		glVertexPointer(3, GL_FLOAT, sizeof(float3), squareVertexBuffer.GetPtr());
 		squareVertexBuffer.Unbind();
 
-		glBeginQuery(GL_TRANSFORM_FEEDBACK_PRIMITIVES_WRITTEN, patchObjectBuffer[i].tfbpw);
 		glBeginTransformFeedback(GL_TRIANGLES);
 
-		glDrawArrays(GL_RENDERING_PRIMITIVE, 0, GL_PATCHES);
+		glDrawArrays(GL_RENDERING_PRIMITIVE, 0, PATCH_VERT_NUM);
 
 		glEndTransformFeedback();
-		glEndQuery(GL_TRANSFORM_FEEDBACK_PRIMITIVES_WRITTEN);
+
 
 		GLuint numPrimitivesWritten = 0;
 		glGetQueryObjectuiv(patchObjectBuffer[i].tfbpw, GL_QUERY_RESULT, &numPrimitivesWritten); //in vertices?

@@ -38,7 +38,7 @@ public:
 	void DrawBorderMesh(const DrawPass::e& drawPass);
 
 public:
-	static bool Supported() { return globalRendering->supportTesselation && globalRendering->supportTransformFB; }
+	static bool Supported() { return false; }
 
 private:
 	struct PatchObjects {
@@ -47,7 +47,7 @@ private:
 		GLuint tfbpw; //query object for GL_TRANSFORM_FEEDBACK_PRIMITIVES_WRITTEN
 	};
 private:
-	void CreateTransformFeedback(const std::vector<PatchObjects>& patchObjectBuffer);
+	void RunTransformFeedback(const std::vector<PatchObjects>& patchObjectBuffer);
 private:
 	enum {
 		MAP_BORDER_L     = 0,
@@ -85,4 +85,4 @@ private:
 	//std::array<VBO, MAP_BORDER_COUNT> borderVertexBuffers;
 };
 
-#endif // _ROAM_MESH_DRAWER_H_
+#endif // _TESS_MESH_DRAWER_H_

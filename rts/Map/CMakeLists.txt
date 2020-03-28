@@ -23,6 +23,8 @@ set(sources_engine_Map
 		"${CMAKE_CURRENT_SOURCE_DIR}/SMF/Legacy/LegacyMeshDrawer.cpp"
 		"${CMAKE_CURRENT_SOURCE_DIR}/SMF/ROAM/Patch.cpp"
 		"${CMAKE_CURRENT_SOURCE_DIR}/SMF/ROAM/RoamMeshDrawer.cpp"
+		"${CMAKE_CURRENT_SOURCE_DIR}/SMF/Tess/TessMeshCommon.cpp"
+		"${CMAKE_CURRENT_SOURCE_DIR}/SMF/Tess/TessMeshShaders.cpp"
 		"${CMAKE_CURRENT_SOURCE_DIR}/SMF/Tess/TessMeshDrawer.cpp"
 		PARENT_SCOPE
 	)
