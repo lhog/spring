@@ -38,8 +38,8 @@ vec4 GetFrustumLineFromMVPMat(int idx) {
 
 
 
-const float tessellatedEdgeSize = 8.0;
-const float tessellationFactor = 1.0;
+const float tessellatedEdgeSize = 16.0;
+const float tessellationFactor = 0.5;
 // Calculate the tessellation factor based on screen space
 // dimensions of the edge
 float ScreenSpaceTessFactor(vec4 p0, vec4 p1) {
@@ -69,7 +69,7 @@ float ScreenSpaceTessFactor(vec4 p0, vec4 p1) {
 	//return clamp(distance(clip0, clip1) / ubo.tessellatedEdgeSize * ubo.tessellationFactor, 1.0, 64.0);
 	//float tessFactor = smoothstep(0.0, 1.0, distance(clip0, clip1) / maxTessValue / tessellatedEdgeSize * tessellationFactor);
 	float tessFactor = clamp(distance(clip0, clip1) / maxTessValue / tessellatedEdgeSize * tessellationFactor, 0.0, 1.0);
-	tessFactor = pow(tessFactor, 1.5);
+	//tessFactor = pow(tessFactor, 2.0);
 	return mix(1.0, maxTessValue, tessFactor);
 }
 
@@ -78,7 +78,7 @@ float ScreenSpaceTessFactor(vec4 p0, vec4 p1) {
 // Sphere radius is given by the patch size
 bool FrustumCheck() {
 	// Fixed radius (increase if patch size is increased in example)
-	const float radius = 8.0f;
+	const float radius = 0.0f;
 	vec4 pos = gl_in[gl_InvocationID].gl_Position;
 
 	// Check sphere against frustum planes
@@ -90,8 +90,8 @@ bool FrustumCheck() {
 }
 
 
-void main(void)
-{
+void main(void) {
+
 	if (!FrustumCheck()) {
 		gl_TessLevelOuter[0] = 0.0;
 		gl_TessLevelOuter[1] = 0.0;
@@ -113,4 +113,5 @@ void main(void)
 	dataTCS[gl_InvocationID].mapUV = dataVS[gl_InvocationID].mapUV;
 
 	gl_out[gl_InvocationID].gl_Position = gl_in[gl_InvocationID].gl_Position;
+
 }

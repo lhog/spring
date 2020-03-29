@@ -73,8 +73,8 @@ CTessMeshShaderTF::CTessMeshShaderTF(const int mapX, const int mapZ):
 	shaderPO->AttachShaderObject(tesSO);
 	shaderPO->AttachShaderObject(fsSO);
 
-	//const char* tfVarying = "vPosTF";
-	//glTransformFeedbackVaryings(shaderPO->GetObjID(), 1, &tfVarying, GL_INTERLEAVED_ATTRIBS);
+	const char* tfVarying = "vPosTF";
+	glTransformFeedbackVaryings(shaderPO->GetObjID(), 1, &tfVarying, GL_INTERLEAVED_ATTRIBS);
 
 	shaderPO->Link();
 
