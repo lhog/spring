@@ -1,11 +1,11 @@
 /* This file is part of the Spring engine (GPL v2 or later), see LICENSE.html */
 
+#include "Rendering/GlobalRendering.h"
 #include "Rendering/Shaders/Shader.h"
 #include "Map/HeightMapTexture.h"
 #include "TessMeshShaders.h"
 
 #include "System/Log/ILog.h"
-
 
 CTessMeshShader::CTessMeshShader(const int mapX, const int mapZ) :
 	mapX(mapX),
@@ -34,6 +34,16 @@ void CTessMeshShader::Activate() {
 
 void CTessMeshShader::SetSquareCoord(const int sx, const int sz) {
 	shaderPO->SetUniform("texSquare", sx, sz);
+}
+
+void CTessMeshShader::SetScreenDims() {
+	bool alreadyBound = shaderPO->IsBound();
+
+	if (!alreadyBound) shaderPO->Enable();
+
+	shaderPO->SetUniform("screenDims", globalRendering->viewSizeX, globalRendering->viewSizeY);
+
+	if (!alreadyBound) shaderPO->Disable();
 }
 
 void CTessMeshShader::Deactivate() {

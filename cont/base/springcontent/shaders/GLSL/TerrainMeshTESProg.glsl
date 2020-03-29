@@ -4,7 +4,7 @@
 
 layout( quads, equal_spacing, ccw ) in;
 
-uniform sampler2D heightMap; 
+uniform sampler2D heightMap;
 
 struct Data {
 	vec2 mapUV;
@@ -21,11 +21,11 @@ out vec3 vPosTF;
 void main() {
 
 	gl_Position	= LERP4(gl_in, gl_Position);
-	
+
 	dataTES.mapUV = LERP4(dataTCS, mapUV);
-	
-	//gl_Position.y = texture(heightMap);
-	
+
+	gl_Position.y = textureLod(heightMap, dataTES.mapUV, 0.0).x;
+
 	vPosTF = gl_Position.xyz;
 	gl_Position = gl_ModelViewProjectionMatrix * gl_Position;
 }

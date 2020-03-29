@@ -53,6 +53,7 @@ void CTessMeshCacheTF::Update(){
 	glPatchParameteri(GL_PATCH_VERTICES, 4); //quads per patch
 
 	tessMeshShader->Activate();
+	tessMeshShader->SetScreenDims();
 
 	for (int i = 0; i < numPatchesX * numPatchesZ; ++i) {
 		if (tessMeshDirty[0] || tessMeshDirty[i + 1]) {
