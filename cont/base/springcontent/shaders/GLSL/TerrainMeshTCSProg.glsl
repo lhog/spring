@@ -4,7 +4,6 @@
 
 layout(vertices = 4) out;
 
-uniform ivec2 texSquare;
 uniform float maxTessValue;
 uniform ivec2 screenDims;
 
@@ -47,8 +46,8 @@ float ScreenSpaceTessFactor1(vec4 p0, vec4 p1) {
 	clip1 /= clip1.w;
 
 	// Convert to viewport coordinates
-	//clip0.xy *= vec2(screenDims);
-	//clip1.xy *= vec2(screenDims);
+	clip0.xy *= vec2(screenDims);
+	clip1.xy *= vec2(screenDims);
 
 	// Return the tessellation factor based on the screen size
 	// given by the distance of the two edge control points in screen space
@@ -56,16 +55,6 @@ float ScreenSpaceTessFactor1(vec4 p0, vec4 p1) {
 	//return clamp(distance(clip0, clip1) / ubo.tessellatedEdgeSize * ubo.tessellationFactor, 1.0, 64.0);
 	float tessFactor = clamp(distance(clip0.xy, clip1.xy) / maxTessValue / tessellatedEdgeSize * tessellationFactor, 0.0, 1.0);
 	return mix(1.0, maxTessValue, tessFactor);
-}
-
-float TriangleFacing(vec4 p0, vec4 p1, vec4 p2) {
-	vec4 p0c = MVP * p0; p0c /= p0c.w;
-	vec4 p1c = MVP * p1; p1c /= p1c.w;
-	vec4 p2c = MVP * p2; p2c /= p2c.w;
-
-	float trArea = determinant(mat2(p0c.xy - p1c.xy, p2c.xy - p1c.xy));
-
-	return mix(1.0, 0.0, float(trArea > 0.0));
 }
 
 // Checks the current's patch visibility against the frustum using a sphere check
@@ -91,21 +80,16 @@ bool FrustumCheck() {
 
 void main(void) {
 
-	if (!FrustumCheck()) {
-		gl_TessLevelOuter[0] = 0.0;
-		gl_TessLevelOuter[1] = 0.0;
-		gl_TessLevelOuter[2] = 0.0;
-		gl_TessLevelOuter[3] = 0.0;
-	} else {
-		// don't generate backface triangles
-		float f = max(
-			TriangleFacing(gl_in[3].gl_Position, gl_in[0].gl_Position, gl_in[1].gl_Position),
-			TriangleFacing(gl_in[1].gl_Position, gl_in[2].gl_Position, gl_in[3].gl_Position) );
+	gl_TessLevelOuter[0] = 0.0;
+	gl_TessLevelOuter[1] = 0.0;
+	gl_TessLevelOuter[2] = 0.0;
+	gl_TessLevelOuter[3] = 0.0;
 
-		gl_TessLevelOuter[0] = ScreenSpaceTessFactor1(gl_in[3].gl_Position, gl_in[0].gl_Position) * f;
-		gl_TessLevelOuter[1] = ScreenSpaceTessFactor1(gl_in[0].gl_Position, gl_in[1].gl_Position) * f;
-		gl_TessLevelOuter[2] = ScreenSpaceTessFactor1(gl_in[1].gl_Position, gl_in[2].gl_Position) * f;
-		gl_TessLevelOuter[3] = ScreenSpaceTessFactor1(gl_in[2].gl_Position, gl_in[3].gl_Position) * f;
+	if (FrustumCheck()) {
+		gl_TessLevelOuter[0] = ScreenSpaceTessFactor1(gl_in[3].gl_Position, gl_in[0].gl_Position);
+		gl_TessLevelOuter[1] = ScreenSpaceTessFactor1(gl_in[0].gl_Position, gl_in[1].gl_Position);
+		gl_TessLevelOuter[2] = ScreenSpaceTessFactor1(gl_in[1].gl_Position, gl_in[2].gl_Position);
+		gl_TessLevelOuter[3] = ScreenSpaceTessFactor1(gl_in[2].gl_Position, gl_in[3].gl_Position);
 	}
 
 	gl_TessLevelInner[0] = mix(gl_TessLevelOuter[0], gl_TessLevelOuter[3], 0.5);

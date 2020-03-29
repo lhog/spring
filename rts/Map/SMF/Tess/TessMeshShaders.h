@@ -25,6 +25,7 @@ protected:
 	Shader::IShaderObject* vsSO;
 	Shader::IShaderObject* tesSO;
 	Shader::IShaderObject* tcsSO;
+	Shader::IShaderObject* gsSO;
 	Shader::IShaderObject* fsSO;
 
 	Shader::IProgramObject* shaderPO;

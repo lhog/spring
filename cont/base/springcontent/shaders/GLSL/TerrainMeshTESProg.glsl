@@ -13,8 +13,6 @@ struct Data {
 in Data dataTCS[];
 out Data dataTES;
 
-out vec3 vPosTF;
-
 #define LERP4VALUES(v0, v1, v2, v3) mix( mix(v0, v1, gl_TessCoord.x), mix(v3, v2, gl_TessCoord.x), gl_TessCoord.y )
 #define LERP4(s, f) LERP4VALUES(s[0].f, s[1].f, s[2].f, s[3].f)
 
@@ -26,6 +24,5 @@ void main() {
 
 	gl_Position.y = textureLod(heightMap, dataTES.mapUV, 0.0).x;
 
-	vPosTF = gl_Position.xyz;
-	gl_Position = gl_ModelViewProjectionMatrix * gl_Position;
+	gl_Position = gl_Position;
 }

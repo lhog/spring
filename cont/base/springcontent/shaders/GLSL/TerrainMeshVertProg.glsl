@@ -29,8 +29,6 @@ void main() {
 	dataVS.mapUV *= (ts - vec2(2.0)) / ts;
 	dataVS.mapUV = SNORM2NORM(dataVS.mapUV);
 	
-	
-
 	worldPos.y = textureLod(heightMap, dataVS.mapUV, 0.0).x;
 
 	gl_Position = worldPos;

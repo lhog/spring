@@ -61,16 +61,18 @@ void CTessMeshShader::Deactivate() {
 	shaderPO->Disable();
 	glActiveTexture(GL_TEXTURE0); glBindTexture(GL_TEXTURE_2D, prevTexID);
 }
-//gsSO = shaderHandler->CreateShaderObject("GLSL/TerrainMeshGSProg.glsl", "", GL_TESS_EVALUATION_SHADER);
 
 CTessMeshShaderTF::CTessMeshShaderTF(const int mapX, const int mapZ):
 	CTessMeshShader(mapX, mapZ)
 {
+	gsSO = shaderHandler->CreateShaderObject("GLSL/TerrainMeshGeomProg.glsl", "", GL_GEOMETRY_SHADER);
+
 	shaderPO = shaderHandler->CreateProgramObject(poClass, "TF-GLSL", false);
 
 	shaderPO->AttachShaderObject(vsSO);
 	shaderPO->AttachShaderObject(tcsSO);
 	shaderPO->AttachShaderObject(tesSO);
+	shaderPO->AttachShaderObject(gsSO);
 	shaderPO->AttachShaderObject(fsSO);
 
 	const char* tfVarying = "vPosTF";
@@ -86,4 +88,5 @@ CTessMeshShaderTF::CTessMeshShaderTF(const int mapX, const int mapZ):
 
 CTessMeshShaderTF::~CTessMeshShaderTF() {
 	shaderHandler->ReleaseProgramObjects(poClass);
+	glDeleteShader(gsSO->GetObjID());
 }
