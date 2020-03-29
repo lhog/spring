@@ -47,8 +47,8 @@ private:
 	};
 private:
 	//tune me
-	static constexpr float camDistDiff = 3.0f;
-	static constexpr float camDirDiff = 0.99939f; // ~2 degrees difference
+	static constexpr float camDistDiff = 2.0f;
+	static constexpr float camDirDiff = 0.9995f; // <2 degrees difference
 
 private:
 	//CSMFGroundDrawer* smfGroundDrawer;

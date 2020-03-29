@@ -82,8 +82,12 @@ void CTessMeshCacheTF::Update(){
 			//GLuint numPrimitivesWritten = 0u;
 			//glGetQueryObjectuiv(tfQuery, GL_QUERY_RESULT, &numPrimitivesWritten); //in triangles
 			//LOG("PatchID = %d numPrimitivesWritten = %d", i, numPrimitivesWritten);
+
+			//tessMeshDirty[i + 1] = false;
 		}
 	}
+
+	//tessMeshDirty[0] = false;
 
 	//glDisable(GL_RASTERIZER_DISCARD);
 	glDisableClientState(GL_VERTEX_ARRAY);

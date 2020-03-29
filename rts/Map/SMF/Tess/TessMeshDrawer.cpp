@@ -135,9 +135,27 @@ void CTessMeshDrawer::Update()
 		lastCamPos.distance(camPos), lastCamDir.dot(camDir) \
 	);
 */
-	if (lastCamPos.distance(camPos) > CTessMeshDrawer::camDistDiff ||
-		abs(lastCamDir.dot(camDir)) < CTessMeshDrawer::camDirDiff) {
+/*
+	LOG("CTessMeshDrawer::Update lastCamDir={%f,%f,%f} camDir={%f,%f,%f} dot1=%f dot2=%f", \
+		lastCamDir.x, lastCamDir.y, lastCamDir.z, \
+		camDir.x, camDir.y, camDir.z, \
+		lastCamDir.dot(camDir), lastCamDir.x * camDir.x + lastCamDir.y * camDir.y + lastCamDir.z * camDir.z \
+	);
+*/
 
+	if (lastCamPos.distance(camPos) > CTessMeshDrawer::camDistDiff ||
+		math::fabs(lastCamDir.dot(camDir)) < CTessMeshDrawer::camDirDiff) {
+/*
+		LOG("CTessMeshDrawer::Update lastCamPos={%f,%f,%f} camPos={%f,%f,%f} lastCamDir={%f,%f,%f} camDir={%f,%f,%f} dist=%f dot=%f", \
+			lastCamPos.x, lastCamPos.y, lastCamPos.z, \
+			camPos.x, camPos.y, camPos.z, \
+			lastCamDir.x, lastCamDir.y, lastCamDir.z, \
+			camDir.x, camDir.y, camDir.z, \
+			lastCamPos.distance(camPos), math::fabs(lastCamDir.dot(camDir)) \
+		);
+
+		LOG("RequestTesselation() %f || %f || drawFrame = %d", lastCamPos.distance(camPos), math::fabs(lastCamDir.dot(camDir)), globalRendering->drawFrame);
+*/
 		lastCamPos = camPos;
 		lastCamDir = camDir;
 		tessMeshCache->RequestTesselation();
