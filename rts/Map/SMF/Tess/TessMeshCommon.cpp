@@ -26,6 +26,7 @@ CTessMeshCacheTF::CTessMeshCacheTF(const int numPatchesX, const int numPatchesZ)
 		glBindTransformFeedback(GL_TRANSFORM_FEEDBACK, 0);
 	}
 	tessMeshShader = std::unique_ptr<CTessMeshShaderTF>(new CTessMeshShaderTF(SQUARE_SIZE * mapDims.mapx, SQUARE_SIZE * mapDims.mapy));
+	tessMeshShader->SetMaxTessValue(static_cast<float>(TeshMessConsts::TESS_LEVEL));
 
 	LOG("CTessMeshCacheTF 2");
 }

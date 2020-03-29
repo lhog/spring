@@ -33,7 +33,18 @@ void CTessMeshShader::Activate() {
 }
 
 void CTessMeshShader::SetSquareCoord(const int sx, const int sz) {
+	// shaderPO is supposed to be enabled
 	shaderPO->SetUniform("texSquare", sx, sz);
+}
+
+void CTessMeshShader::SetMaxTessValue(float maxTess) {
+	bool alreadyBound = shaderPO->IsBound();
+
+	if (!alreadyBound) shaderPO->Enable();
+
+	shaderPO->SetUniform("maxTessValue", maxTess);
+
+	if (!alreadyBound) shaderPO->Disable();
 }
 
 void CTessMeshShader::SetScreenDims() {

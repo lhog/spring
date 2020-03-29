@@ -15,6 +15,7 @@ public:
 public:
 	virtual void Activate();
 	virtual void SetSquareCoord(const int sx, const int sz);
+	virtual void SetMaxTessValue(float maxTess);
 	virtual void SetScreenDims();
 	virtual void Deactivate();
 protected:
