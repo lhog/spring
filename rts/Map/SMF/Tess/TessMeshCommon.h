@@ -17,7 +17,7 @@
 struct TeshMessConsts {
 	static constexpr int32_t UHM_TO_MESH = 64.0f; // Divider to divide UHM rect coord by to get Patch{x,y}
 	static constexpr int32_t PATCH_SIZE = 128; // must match SMFReadMap::bigSquareSize
-	static constexpr int32_t TESS_LEVEL = 32; // should be a power of two, less or equal than GL_MAX_TESS_GEN_LEVEL (64)
+	static constexpr int32_t TESS_LEVEL = 16; // should be a power of two, less or equal than GL_MAX_TESS_GEN_LEVEL (64)
 	static constexpr int32_t PATCH_RC_QUAD_NUM = PATCH_SIZE / TESS_LEVEL; // number of quads in one row/column of the patch
 	static constexpr int32_t PATCH_VERT_NUM = 4 * PATCH_RC_QUAD_NUM * PATCH_RC_QUAD_NUM;  // number of vertices in whole patch
 	static constexpr int32_t TESS_TRIANGLE_NUM_MAX = (PATCH_RC_QUAD_NUM * PATCH_RC_QUAD_NUM) * (TESS_LEVEL * TESS_LEVEL) * 2;
