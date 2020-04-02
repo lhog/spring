@@ -33,8 +33,7 @@ struct Data {
 in Data dataTES[];
 out Data dataGS;
 
-// seems meaningless
-/*
+// seems meaningless, but god for test to reduce the number of saved triangles
 bool CheckTriangleFacing(vec4 p0, vec4 p1, vec4 p2) {
 
 	vec4 p0c = gl_ModelViewProjectionMatrix * p0; p0c /= p0c.w;
@@ -45,7 +44,7 @@ bool CheckTriangleFacing(vec4 p0, vec4 p1, vec4 p2) {
 
 	return (trNormal.z < 0.0);
 }
-*/
+
 
 void main() {
 	

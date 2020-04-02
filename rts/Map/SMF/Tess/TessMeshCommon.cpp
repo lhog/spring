@@ -26,7 +26,7 @@ CTessMeshCacheTF::CTessMeshCacheTF(const int numPatchesX, const int numPatchesZ)
 		glBindTransformFeedback(GL_TRANSFORM_FEEDBACK, 0);
 	}
 	tessMeshShader = std::unique_ptr<CTessMeshShaderTF>(new CTessMeshShaderTF(SQUARE_SIZE * mapDims.mapx, SQUARE_SIZE * mapDims.mapy));
-	tessMeshShader->SetMaxTessValue(static_cast<float>(TeshMessConsts::TESS_LEVEL));
+	tessMeshShader->SetMaxTessValue(TeshMessConsts::TESS_LEVEL);
 
 	LOG("CTessMeshCacheTF 2");
 }
@@ -69,11 +69,11 @@ void CTessMeshCacheTF::Update(){
 
 			//glBindBufferBase(GL_TRANSFORM_FEEDBACK_BUFFER, 0, meshTessVBOs[i]);
 			//glBindTransformFeedback(GL_TRANSFORM_FEEDBACK, meshTessTFOs[i]);
-				//glBeginTransformFeedback(GL_TRIANGLES);
+			//glBeginTransformFeedback(GL_TRIANGLES);
 
-				glDrawArrays(GL_PATCHES, 0, TeshMessConsts::PATCH_VERT_NUM);
+			glDrawArrays(GL_PATCHES, 0, TeshMessConsts::PATCH_VERT_NUM);
 
-				//glEndTransformFeedback();
+			//glEndTransformFeedback();
 			//glBindTransformFeedback(GL_TRANSFORM_FEEDBACK, 0);
 			//glBindBufferBase(GL_TRANSFORM_FEEDBACK_BUFFER, 0, 0);
 
@@ -83,11 +83,11 @@ void CTessMeshCacheTF::Update(){
 			//glGetQueryObjectuiv(tfQuery, GL_QUERY_RESULT, &numPrimitivesWritten); //in triangles
 			//LOG("PatchID = %d numPrimitivesWritten = %d", i, numPrimitivesWritten);
 
-			//tessMeshDirty[i + 1] = false;
+			tessMeshDirty[i + 1] = false;
 		}
 	}
 
-	//tessMeshDirty[0] = false;
+	tessMeshDirty[0] = false;
 
 	//glDisable(GL_RASTERIZER_DISCARD);
 	glDisableClientState(GL_VERTEX_ARRAY);
@@ -102,8 +102,8 @@ void CTessMeshCacheTF::Update(){
 void CTessMeshCacheTF::Reset(){
 }
 
-void CTessMeshCacheTF::DrawMesh(const int px, const int py){
-	const int idx = px * numPatchesZ + py;
+void CTessMeshCacheTF::DrawMesh(const int px, const int pz){
+	const int idx = px * numPatchesZ + pz;
 	glEnableClientState(GL_VERTEX_ARRAY);
 
 	glBindBuffer(GL_ARRAY_BUFFER, meshTessVBOs[idx]);
@@ -121,31 +121,141 @@ CTessMeshCacheSSBO::CTessMeshCacheSSBO(const int numPatchesX, const int numPatch
 	CTessMeshCache(numPatchesX, numPatchesZ, GL_SHADER_STORAGE_BUFFER)
 {
 	drawIndirect = GLEW_ARB_draw_indirect;
-	//glMemoryBarrier()
-	//glGenBuffers
+
+	LOG("CTessMeshCacheSSBO");
+
+	meshTessDAIBs.resize(numPatchesX * numPatchesZ);
+
+	for (auto i = 0; i < numPatchesX * numPatchesZ; ++i) {
+		glGenBuffers(1, &meshTessDAIBs[i]);
+		glBindBuffer(GL_DRAW_INDIRECT_BUFFER, meshTessDAIBs[i]);
+		glBufferData(GL_DRAW_INDIRECT_BUFFER, sizeof(DrawArraysIndirectCommand), nullptr, GL_STREAM_COPY);
+		glBindBuffer(GL_DRAW_INDIRECT_BUFFER, 0);
+	}
+
+	memset(&daicZero, 0, sizeof(DrawArraysIndirectCommand));
+	daicZero.primCount = 1u;
+
+	tessMeshShader = std::unique_ptr<CTessMeshShaderSSBO>(new CTessMeshShaderSSBO(SQUARE_SIZE * mapDims.mapx, SQUARE_SIZE * mapDims.mapy));
+	tessMeshShader->SetMaxTessValue(TeshMessConsts::TESS_LEVEL);
+
+	LOG("CTessMeshCacheSSBO 2");
+
 }
 
 CTessMeshCacheSSBO::~CTessMeshCacheSSBO(){
 }
 
 void CTessMeshCacheSSBO::Update(){
+	if (std::find(tessMeshDirty.begin(), tessMeshDirty.end(), true) == tessMeshDirty.end()) //nothing to do
+		return;
+
+	glEnableClientState(GL_VERTEX_ARRAY);
+	glEnable(GL_RASTERIZER_DISCARD);
+	glDisable(GL_CULL_FACE);
+
+	glBindBuffer(GL_ARRAY_BUFFER, meshTemplateVBO);
+	glVertexPointer(3, GL_FLOAT, 0, 0);
+	glBindBuffer(GL_ARRAY_BUFFER, 0);
+
+	glPatchParameteri(GL_PATCH_VERTICES, 4); //quads per patch
+
+	tessMeshShader->Activate();
+	tessMeshShader->SetScreenDims();
+
+	GLuint npwNow = 0u;
+	GLuint npwTotal = 0u;
+
+	for (int i = 0; i < numPatchesX * numPatchesZ; ++i) {
+		if (tessMeshDirty[0] || tessMeshDirty[i + 1]) {
+			int x = i / numPatchesZ;
+			int z = i % numPatchesZ;
+
+			tessMeshShader->SetSquareCoord(x, z);
+
+			glBindBuffer(GL_DRAW_INDIRECT_BUFFER, meshTessDAIBs[i]);
+			glBufferSubData(GL_DRAW_INDIRECT_BUFFER, 0, sizeof(DrawArraysIndirectCommand), &daicZero);
+			glBindBuffer(GL_DRAW_INDIRECT_BUFFER, 0);
+
+			glBindBufferBase(GL_SHADER_STORAGE_BUFFER, 0, meshTessDAIBs[i]);
+			glBindBufferBase(GL_SHADER_STORAGE_BUFFER, 1, meshTessVBOs[i]);
+
+			if (runQueries)
+				glBeginQuery(GL_PRIMITIVES_GENERATED, tessMeshQuery);
+
+			glDrawArrays(GL_PATCHES, 0, TeshMessConsts::PATCH_VERT_NUM);
+			glMemoryBarrier(GL_SHADER_STORAGE_BARRIER_BIT);
+
+			if (runQueries) {
+				glEndQuery(GL_PRIMITIVES_GENERATED);
+				glGetQueryObjectuiv(tessMeshQuery, GL_QUERY_RESULT, &npwNow); //in triangles
+				npwTotal += npwNow;
+				/*
+				DrawArraysIndirectCommand daicTmp;
+				glBindBuffer(GL_DRAW_INDIRECT_BUFFER, meshTessDAIBs[i]);
+				glGetBufferSubData(GL_DRAW_INDIRECT_BUFFER, 0, sizeof(DrawArraysIndirectCommand), &daicTmp);
+				glBindBuffer(GL_DRAW_INDIRECT_BUFFER, 0);
+
+				LOG("daicTmp[%d] = %d || %d", i, daicTmp.count, daicTmp.primCount);
+				*/
+			}
+
+			glBindBufferBase(GL_SHADER_STORAGE_BUFFER, 0, 0);
+			glBindBufferBase(GL_SHADER_STORAGE_BUFFER, 1, 0);
+
+			tessMeshDirty[i + 1] = false;
+		}
+	}
+
+	if (runQueries && tessMeshDirty[0])
+		LOG("[Tesselation Shader:SSBO-Backend] Total Number of primitives written: %d", npwTotal);
+
+	tessMeshDirty[0] = false;
+
+	glDisable(GL_RASTERIZER_DISCARD);
+	glEnable(GL_CULL_FACE);
+	glDisableClientState(GL_VERTEX_ARRAY);
+	tessMeshShader->Deactivate();
+	glPatchParameteri(GL_PATCH_VERTICES, 3); // restore default
 }
 
 void CTessMeshCacheSSBO::Reset(){
 }
 
-void CTessMeshCacheSSBO::DrawMesh(const int px, const int py){
+void CTessMeshCacheSSBO::DrawMesh(const int px, const int pz){
+	const int idx = px * numPatchesZ + pz;
+
+	glEnableClientState(GL_VERTEX_ARRAY);
+
+	glBindBuffer(GL_ARRAY_BUFFER, meshTessVBOs[idx]);
+	glVertexPointer(3, GL_FLOAT, 0, (void*)0);
+	glBindBuffer(GL_ARRAY_BUFFER, 0);
+
+	glBindBuffer(GL_DRAW_INDIRECT_BUFFER, meshTessDAIBs[idx]);
+
+//	drawIndirect = false;
+
+	if (drawIndirect) {
+		glDrawArraysIndirect(GL_TRIANGLES, 0);
+		glMemoryBarrier(GL_COMMAND_BARRIER_BIT);
+	} else {
+		DrawArraysIndirectCommand daicTmp;
+		glGetBufferSubData(GL_DRAW_INDIRECT_BUFFER, 0, sizeof(DrawArraysIndirectCommand), &daicTmp);
+		glDrawArrays(GL_TRIANGLES, 0, daicTmp.count);
+//		LOG("Drawing[%d,%d] patch. Vertices Count = %d, Primitives Count = %d", px, pz, daicTmp.count, daicTmp.primCount);
+	}
+
+	glBindBuffer(GL_DRAW_INDIRECT_BUFFER, 0);
+
+	glDisableClientState(GL_VERTEX_ARRAY);
 }
 
 void CTessMeshCache::RequestTesselation() {
-	//std::fill(tessMeshDirty.begin(), tessMeshDirty.end(), true);
-	//LOG("RequestTesselation");
 	tessMeshDirty[0] = true;
 }
 
-void CTessMeshCache::RequestTesselation(const int px, const int py) {
-	LOG("RequestTesselation {%d, %d}", px, py);
-	tessMeshDirty[px * numPatchesZ + py + 1] = true;
+void CTessMeshCache::RequestTesselation(const int px, const int pz) {
+	tessMeshDirty[px * numPatchesZ + pz + 1] = true;
 }
 
 void CTessMeshCache::FillMeshTemplateBuffer() {
@@ -163,7 +273,8 @@ void CTessMeshCache::FillMeshTemplateBuffer() {
 
 CTessMeshCache::CTessMeshCache(const int numPatchesX, const int numPatchesZ, const GLenum meshTessBufferType) :
 	numPatchesX(numPatchesX),
-	numPatchesZ(numPatchesZ)
+	numPatchesZ(numPatchesZ),
+	runQueries(false)
 {
 	LOG("CTessMeshCache");
 	//meshTemplate = std::make_unique<MeshPatches>();
@@ -177,6 +288,8 @@ CTessMeshCache::CTessMeshCache(const int numPatchesX, const int numPatchesZ, con
 	glBufferData(GL_ARRAY_BUFFER, sizeof(MeshPatches), meshTemplate.get(), GL_STATIC_DRAW);
 	glBindBuffer(GL_ARRAY_BUFFER, 0);
 
+	glGenQueries(1, &tessMeshQuery);
+
 	meshTessVBOs.resize(numPatchesX * numPatchesZ);
 	tessMeshDirty.resize(numPatchesX * numPatchesZ + 1); //first one is a global retesselation bool
 
@@ -185,7 +298,6 @@ CTessMeshCache::CTessMeshCache(const int numPatchesX, const int numPatchesZ, con
 	for (auto& meshTessVBO : meshTessVBOs) {
 		glGenBuffers(1, &meshTessVBO);
 
-		LOG("glBindBuffer(%d, %d)", meshTessBufferType, meshTessVBO);
 		glBindBuffer(meshTessBufferType, meshTessVBO);
 		glBufferData(meshTessBufferType, TeshMessConsts::TESS_TRIANGLE_NUM_MAX * sizeof(MeshTessTriangle), nullptr, GL_DYNAMIC_COPY);
 	}
@@ -196,6 +308,8 @@ CTessMeshCache::CTessMeshCache(const int numPatchesX, const int numPatchesZ, con
 
 CTessMeshCache::~CTessMeshCache() {
 	glDeleteBuffers(1, &meshTemplateVBO);
+
+	glDeleteQueries(1, &tessMeshQuery);
 
 	for (const auto meshTessVBO : meshTessVBOs) {
 		glDeleteBuffers(1, &meshTessVBO);

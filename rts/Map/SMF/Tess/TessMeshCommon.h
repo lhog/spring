@@ -57,14 +57,19 @@ public:
 public:
 	virtual void Update() = 0;
 	virtual void RequestTesselation();
-	virtual void RequestTesselation(const int px, const int py);
+	virtual void RequestTesselation(const int px, const int pz);
+	virtual void SetRunQueries(bool b) { runQueries = b; }
 	virtual void Reset() = 0;
-	virtual void DrawMesh(const int px, const int py) = 0;
+	virtual void DrawMesh(const int px, const int pz) = 0;
 private:
 	void FillMeshTemplateBuffer();
 protected:
 	int numPatchesX;
 	int numPatchesZ;
+
+	bool runQueries;
+
+	GLuint tessMeshQuery;
 
 	std::vector<bool> tessMeshDirty;
 
@@ -92,7 +97,7 @@ public:
 	// Inherited via CTessMeshCache
 	virtual void Update() override;
 	virtual void Reset() override;
-	virtual void DrawMesh(const int px, const int py) override;
+	virtual void DrawMesh(const int px, const int pz) override;
 private:
 	std::vector<GLuint> meshTessTFOs;
 };
@@ -107,15 +112,16 @@ public:
 	};
 public:
 	//, const GLenum meshTessBufferType = GL_SHADER_STORAGE_BUFFER
-	CTessMeshCacheSSBO(const int numPatchesX, const int nPY);
+	CTessMeshCacheSSBO(const int numPatchesX, const int numPatchesZ);
 	virtual ~CTessMeshCacheSSBO();
 public:
 	// Inherited via CTessMeshCache
 	virtual void Update() override;
 	virtual void Reset() override;
-	virtual void DrawMesh(const int px, const int py) override;
+	virtual void DrawMesh(const int px, const int pz) override;
 private:
-
+	DrawArraysIndirectCommand daicZero;
+	std::vector<GLuint> meshTessDAIBs;
 	bool drawIndirect;
 };
 

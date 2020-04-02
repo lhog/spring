@@ -26,7 +26,7 @@ void main() {
 	//rescale to not sample edge pixels
 	vec2 ts = vec2(textureSize(heightMap, 0));
 	dataVS.mapUV = NORM2SNORM(dataVS.mapUV);
-	dataVS.mapUV *= (ts - vec2(2.0)) / ts;
+	dataVS.mapUV *= (ts - vec2(1.0)) / ts;
 	dataVS.mapUV = SNORM2NORM(dataVS.mapUV);
 	
 	worldPos.y = textureLod(heightMap, dataVS.mapUV, 0.0).x;

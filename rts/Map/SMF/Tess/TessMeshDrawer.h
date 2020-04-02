@@ -51,7 +51,7 @@ private:
 	static constexpr float camDirDiff = 0.9995f; // <2 degrees difference
 
 private:
-	//CSMFGroundDrawer* smfGroundDrawer;
+	CSMFGroundDrawer* smfGroundDrawer;
 
 	std::unique_ptr<CTessMeshCache> tessMeshCache;
 

@@ -62,6 +62,8 @@ void CTessMeshShader::Deactivate() {
 	glActiveTexture(GL_TEXTURE0); glBindTexture(GL_TEXTURE_2D, prevTexID);
 }
 
+/////////////////////////////////////////////////////////////////////////////////
+
 CTessMeshShaderTF::CTessMeshShaderTF(const int mapX, const int mapZ):
 	CTessMeshShader(mapX, mapZ)
 {
@@ -78,6 +80,8 @@ CTessMeshShaderTF::CTessMeshShaderTF(const int mapX, const int mapZ):
 	const char* tfVarying = "vPosTF";
 	glTransformFeedbackVaryings(shaderPO->GetObjID(), 1, &tfVarying, GL_INTERLEAVED_ATTRIBS);
 
+	//shaderPO->SetFlag("SSBO", 0);
+
 	shaderPO->Link();
 
 	shaderPO->Enable();
@@ -87,6 +91,36 @@ CTessMeshShaderTF::CTessMeshShaderTF(const int mapX, const int mapZ):
 }
 
 CTessMeshShaderTF::~CTessMeshShaderTF() {
+	shaderHandler->ReleaseProgramObjects(poClass);
+	glDeleteShader(gsSO->GetObjID());
+}
+
+/////////////////////////////////////////////////////////////////////////////////
+
+CTessMeshShaderSSBO::CTessMeshShaderSSBO(const int mapX, const int mapZ) :
+	CTessMeshShader(mapX, mapZ)
+{
+	gsSO = shaderHandler->CreateShaderObject("GLSL/TerrainMeshGeomProg.glsl", gsDef, GL_GEOMETRY_SHADER);
+
+	shaderPO = shaderHandler->CreateProgramObject(poClass, "SSBO-GLSL", false);
+
+	shaderPO->AttachShaderObject(vsSO);
+	shaderPO->AttachShaderObject(tcsSO);
+	shaderPO->AttachShaderObject(tesSO);
+	shaderPO->AttachShaderObject(gsSO);
+	shaderPO->AttachShaderObject(fsSO);
+
+	//shaderPO->SetFlag("SSBO", 1);
+
+	shaderPO->Link();
+
+	shaderPO->Enable();
+	shaderPO->SetUniform("mapDims", mapX, mapZ);
+	shaderPO->SetUniform("heightMap", 0);
+	shaderPO->Disable();
+}
+
+CTessMeshShaderSSBO::~CTessMeshShaderSSBO() {
 	shaderHandler->ReleaseProgramObjects(poClass);
 	glDeleteShader(gsSO->GetObjID());
 }
