@@ -22,18 +22,20 @@ class CTessMeshDrawer : public IMeshDrawer, public CEventClient
 public:
 	// CEventClient interface
 	bool WantsEvent(const std::string& eventName) override {
-		return (eventName == "UnsyncedHeightMapUpdate") || (eventName == "Update");
+		return (eventName == "UnsyncedHeightMapUpdate") || (eventName == "Update") || (eventName == "DrawInMiniMap");
 	}
 	bool GetFullRead() const override { return true; }
 	int  GetReadAllyTeam() const override { return AllAccessTeam; }
 
 	void UnsyncedHeightMapUpdate(const SRectangle& rect) override;
+	void SunChanged() override;
 	void Update() override;
 public:
 	CTessMeshDrawer(CSMFGroundDrawer* gd);
 	~CTessMeshDrawer();
 
 	void DrawMesh(const DrawPass::e& drawPass) override;
+	void DrawInMiniMap() override;
 	void DrawBorderMesh(const DrawPass::e& drawPass) override;
 public:
 	static bool Supported();

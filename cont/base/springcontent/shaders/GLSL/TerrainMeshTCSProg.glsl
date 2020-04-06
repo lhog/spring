@@ -10,20 +10,14 @@ uniform ivec2 mapDims;
 
 uniform sampler2D heightMap;
 
+uniform mat4 shadowMat;
+
 struct Data {
 	vec2 mapUV;
 };
 
 in Data dataVS[];
 out Data dataTCS[4];
-
-#define MVP gl_ModelViewProjectionMatrix
-
-#define GET_FRUSTUM_LINE(j, s) vec4( \
-	MVP[0][3] s MVP[0][j], \
-	MVP[1][3] s MVP[1][j], \
-	MVP[2][3] s MVP[2][j], \
-	MVP[3][3] s MVP[3][j] )
 
 #define linstep(x0, x1, xn) ((xn - x0) / (x1 - x0))
 
@@ -56,64 +50,39 @@ float ScreenSpaceTessFactor(vec4 p0, vec4 p1) {
 	// given by the distance of the two edge control points in screen space
 	// and a reference (min.) tessellation size for the edge set by the application
 	//return clamp(distance(clip0, clip1) / ubo.tessellatedEdgeSize * ubo.tessellationFactor, 1.0, 64.0);
+	return 32.0;
 	return clamp(distance(clip0.xy, clip1.xy) / tessellatedEdgeSize * tessellationFactor, 1.0, float(maxTessValue));
+	//return 1.0;
 }
 
-/*
-float TerrainIrregularityTessFactor() {
-	float M = 0.0;
-	float S = 0.0;
-	float k = 0.0;
-	for (float x = dataVS[0].mapUV.x; x <= dataVS[2].mapUV.x; x += (dataVS[2].mapUV.x - dataVS[0].mapUV.x)/float(maxTessValue))
-	for (float z = dataVS[0].mapUV.y; z <= dataVS[2].mapUV.y; z += (dataVS[2].mapUV.y - dataVS[0].mapUV.y)/float(maxTessValue)) {
-		k++;
-		float y = textureLod(heightMap, vec2(x,z), 0.0).x;
-		float oldM = M;
-		M = M + (y - M) / k;
-		S = S + (y - M) * (y - oldM);
-		if (k > 2.0) break;
+// Checks the current's patch visibility against the playerCam or shadowCam frustum
+// Special case when quad covers view frustum (extreme zoom in) is not covered
+bool FrustumCheck(mat4 MVP) {
+	bool res = false;
+	for (int i = 0; i < 4; ++i) {
+		vec4 mvpPos = MVP * gl_in[i].gl_Position;
+		res = res || all(lessThanEqual(abs(mvpPos.xyz), vec3(mvpPos.w)));
 	}
-	float sd = sqrt(S / (k - 1.0));
-	//return float(dataVS[0].mapUV.y < dataVS[2].mapUV.y);
-	float tessFactor = clamp(sd / M, 0.0, 1.0);
-	return mix(1.0, float(maxTessValue), tessFactor);
-}
-*/
-
-// Checks the current's patch visibility against the frustum using a sphere check
-// Sphere radius is given by the patch size
-bool FrustumCheck() {
-	// Fixed radius (increase if patch size is increased in example)
-	const float radius = 0.0f;
-	vec4 pos = gl_in[gl_InvocationID].gl_Position;
-
-	// https://stackoverflow.com/questions/12836967/extracting-view-frustum-planes-hartmann-gribbs-method
-	/// unwrap
-	if (dot(pos, GET_FRUSTUM_LINE(0, +) + radius) < 0.0) return false;
-	if (dot(pos, GET_FRUSTUM_LINE(0, -) + radius) < 0.0) return false;
-	if (dot(pos, GET_FRUSTUM_LINE(1, +) + radius) < 0.0) return false;
-	if (dot(pos, GET_FRUSTUM_LINE(1, -) + radius) < 0.0) return false;
-	if (dot(pos, GET_FRUSTUM_LINE(2, +) + radius) < 0.0) return false;
-	if (dot(pos, GET_FRUSTUM_LINE(2, -) + radius) < 0.0) return false;
-
-	return true;
+	return res;
 }
 
-#undef MVP
+#define CULL_TRIANGLES 1
 
 void main(void) {
 
 	gl_TessLevelOuter[0] = 0.0;
 	gl_TessLevelOuter[1] = 0.0;
 	gl_TessLevelOuter[2] = 0.0;
-	gl_TessLevelOuter[3] = 0.0;
-
-	if (FrustumCheck()) {
-
-		gl_TessLevelOuter[0] = max(ScreenSpaceTessFactor(gl_in[3].gl_Position, gl_in[0].gl_Position));
-		gl_TessLevelOuter[1] = max(ScreenSpaceTessFactor(gl_in[0].gl_Position, gl_in[1].gl_Position));
-		gl_TessLevelOuter[2] = max(ScreenSpaceTessFactor(gl_in[1].gl_Position, gl_in[2].gl_Position));
-		gl_TessLevelOuter[3] = max(ScreenSpaceTessFactor(gl_in[2].gl_Position, gl_in[3].gl_Position));
+	gl_TessLevelOuter[3] = 0.0;	
+	
+#if (CULL_TRIANGLES == 1)
+	if ( FrustumCheck(gl_ModelViewProjectionMatrix) || FrustumCheck(shadowMat) )
+#endif
+	{
+		gl_TessLevelOuter[0] = ScreenSpaceTessFactor(gl_in[3].gl_Position, gl_in[0].gl_Position);
+		gl_TessLevelOuter[1] = ScreenSpaceTessFactor(gl_in[0].gl_Position, gl_in[1].gl_Position);
+		gl_TessLevelOuter[2] = ScreenSpaceTessFactor(gl_in[1].gl_Position, gl_in[2].gl_Position);
+		gl_TessLevelOuter[3] = ScreenSpaceTessFactor(gl_in[2].gl_Position, gl_in[3].gl_Position);
 	}
 
 	gl_TessLevelInner[0] = mix(gl_TessLevelOuter[0], gl_TessLevelOuter[3], 0.5);

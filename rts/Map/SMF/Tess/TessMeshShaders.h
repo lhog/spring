@@ -17,6 +17,7 @@ public:
 	virtual void SetSquareCoord(const int sx, const int sz);
 	virtual void SetMaxTessValue(float maxTess);
 	virtual void SetScreenDims();
+	virtual void SetShadowMatrix();
 	virtual void Deactivate();
 protected:
 	const int mapX;
@@ -26,7 +27,7 @@ protected:
 	Shader::IShaderObject* tesSO;
 	Shader::IShaderObject* tcsSO;
 	Shader::IShaderObject* gsSO;
-	Shader::IShaderObject* fsSO;
+	//Shader::IShaderObject* fsSO;
 
 	Shader::IProgramObject* shaderPO;
 
@@ -48,6 +49,26 @@ public:
 private:
 	const std::string gsDef = "#define SSBO\n";
 	const std::string poClass = "[TessMeshDrawer-SSBO]";
+};
+
+class CTessHMVarianceShader {
+public:
+	CTessHMVarianceShader(const GLuint logTexID, const int lsx = 32, const int lsy = 32, const int lsz = 1);
+	~CTessHMVarianceShader();
+	void Activate();
+	void BindTextureLevel(const int lvl);
+	void UnbindTextureLevel();
+	void Deactivate();
+private:
+	GLint prevTexID;
+	GLuint logTexID;
+
+	int curMipLevel;
+
+	int lsx, lsy, lsz;
+	Shader::IShaderObject* hmvSO;
+	Shader::IProgramObject* hmvPO;
+	const std::string poClass = "[TessMeshDrawer-HMVar]";
 };
 
 

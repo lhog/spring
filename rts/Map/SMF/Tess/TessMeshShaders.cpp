@@ -2,6 +2,7 @@
 
 #include "Rendering/GlobalRendering.h"
 #include "Rendering/Shaders/Shader.h"
+#include "Rendering/ShadowHandler.h"
 #include "Map/HeightMapTexture.h"
 #include "TessMeshShaders.h"
 
@@ -14,15 +15,16 @@ CTessMeshShader::CTessMeshShader(const int mapX, const int mapZ) :
 	vsSO = shaderHandler->CreateShaderObject("GLSL/TerrainMeshVertProg.glsl", "", GL_VERTEX_SHADER);
 	tcsSO = shaderHandler->CreateShaderObject("GLSL/TerrainMeshTCSProg.glsl", "", GL_TESS_CONTROL_SHADER);
 	tesSO = shaderHandler->CreateShaderObject("GLSL/TerrainMeshTESProg.glsl", "", GL_TESS_EVALUATION_SHADER);
-	fsSO = shaderHandler->CreateShaderObject("GLSL/TerrainMeshFragProg.glsl", "", GL_FRAGMENT_SHADER); //debug only
+	//fsSO = shaderHandler->CreateShaderObject("GLSL/TerrainMeshFragProg.glsl", "", GL_FRAGMENT_SHADER); //debug only
 }
 
 CTessMeshShader::~CTessMeshShader() {
 	//seems like engine doesn't do it
+	#pragma message ( "TODO: recheck", __FILE__, __LINE__ )
 	glDeleteShader(vsSO->GetObjID());
 	glDeleteShader(tcsSO->GetObjID());
 	glDeleteShader(tesSO->GetObjID());
-	glDeleteShader(fsSO->GetObjID());
+	//glDeleteShader(fsSO->GetObjID());
 }
 
 void CTessMeshShader::Activate() {
@@ -57,6 +59,16 @@ void CTessMeshShader::SetScreenDims() {
 	if (!alreadyBound) shaderPO->Disable();
 }
 
+void CTessMeshShader::SetShadowMatrix() {
+	bool alreadyBound = shaderPO->IsBound();
+
+	if (!alreadyBound) shaderPO->Enable();
+
+	shaderPO->SetUniformMatrix4x4("shadowMat", false, shadowHandler.GetShadowMatrixRaw());
+
+	if (!alreadyBound) shaderPO->Disable();
+}
+
 void CTessMeshShader::Deactivate() {
 	shaderPO->Disable();
 	glActiveTexture(GL_TEXTURE0); glBindTexture(GL_TEXTURE_2D, prevTexID);
@@ -75,7 +87,7 @@ CTessMeshShaderTF::CTessMeshShaderTF(const int mapX, const int mapZ):
 	shaderPO->AttachShaderObject(tcsSO);
 	shaderPO->AttachShaderObject(tesSO);
 	shaderPO->AttachShaderObject(gsSO);
-	shaderPO->AttachShaderObject(fsSO);
+	//shaderPO->AttachShaderObject(fsSO);
 
 	const char* tfVarying = "vPosTF";
 	glTransformFeedbackVaryings(shaderPO->GetObjID(), 1, &tfVarying, GL_INTERLEAVED_ATTRIBS);
@@ -108,7 +120,7 @@ CTessMeshShaderSSBO::CTessMeshShaderSSBO(const int mapX, const int mapZ) :
 	shaderPO->AttachShaderObject(tcsSO);
 	shaderPO->AttachShaderObject(tesSO);
 	shaderPO->AttachShaderObject(gsSO);
-	shaderPO->AttachShaderObject(fsSO);
+	//shaderPO->AttachShaderObject(fsSO);
 
 	//shaderPO->SetFlag("SSBO", 1);
 
@@ -123,4 +135,68 @@ CTessMeshShaderSSBO::CTessMeshShaderSSBO(const int mapX, const int mapZ) :
 CTessMeshShaderSSBO::~CTessMeshShaderSSBO() {
 	shaderHandler->ReleaseProgramObjects(poClass);
 	glDeleteShader(gsSO->GetObjID());
+}
+
+CTessHMVarianceShader::CTessHMVarianceShader(const GLuint logTexID, const int lsx, const int lsy, const int lsz):
+	logTexID(logTexID),
+	lsx(lsx), lsy(lsy), lsz(lsz)
+{
+	hmvSO = shaderHandler->CreateShaderObject("GLSL/HMVarianceCSProg.glsl", "", GL_COMPUTE_SHADER);
+	hmvPO->AttachShaderObject(hmvSO);
+	hmvPO->SetFlag("LSX", lsx);
+	hmvPO->SetFlag("LSY", lsy);
+	hmvPO->SetFlag("LSZ", lsz);
+
+	hmvPO->Link();
+}
+
+CTessHMVarianceShader::~CTessHMVarianceShader() {
+	shaderHandler->ReleaseProgramObjects(poClass);
+	#pragma message ( "TODO: recheck", __FILE__, __LINE__ )
+	glDeleteShader(hmvSO->GetObjID());
+}
+
+void CTessHMVarianceShader::Activate() {
+	glActiveTexture(GL_TEXTURE0);
+	glGetIntegerv(GL_TEXTURE_BINDING_2D, &prevTexID);
+	glBindTexture(GL_TEXTURE_2D, logTexID);
+	hmvPO->Enable();
+}
+
+void CTessHMVarianceShader::BindTextureLevel(const int lvl) {
+	curMipLevel = lvl;
+
+	if (curMipLevel == -1) {
+		glActiveTexture(GL_TEXTURE0);
+		glGetIntegerv(GL_TEXTURE_BINDING_2D, &prevTexID);
+		glBindTexture(GL_TEXTURE_2D, heightMapTexture->GetTextureID()); //source
+	} else {
+		glBindImageTexture(0, logTexID, curMipLevel, GL_FALSE, 0, GL_READ_ONLY, GL_R32F); //source
+	}
+
+	glBindImageTexture(1, logTexID, curMipLevel + 1, GL_FALSE, 0, GL_WRITE_ONLY, GL_R32F); //destination
+
+	bool alreadyBound = hmvPO->IsBound();
+	if (!alreadyBound) hmvPO->Enable();
+
+	hmvPO->SetUniform("lvl", curMipLevel);
+
+	if (!alreadyBound) hmvPO->Disable();
+}
+
+void CTessHMVarianceShader::UnbindTextureLevel() {
+	if (curMipLevel == -1) {
+		glActiveTexture(GL_TEXTURE0);
+		glBindTexture(GL_TEXTURE_2D, prevTexID); //source
+	} else {
+		glBindImageTexture(0, 0, curMipLevel, GL_FALSE, 0, GL_READ_ONLY, GL_R32F); //source
+	}
+
+	glBindImageTexture(1, 0, curMipLevel + 1, GL_FALSE, 0, GL_WRITE_ONLY, GL_R32F); //destination
+}
+
+void CTessHMVarianceShader::Deactivate() {
+	hmvPO->Disable();
+	glActiveTexture(GL_TEXTURE0);
+	glBindTexture(GL_TEXTURE_2D, prevTexID);
 }

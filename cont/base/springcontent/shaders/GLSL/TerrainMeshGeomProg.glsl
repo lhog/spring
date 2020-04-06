@@ -6,6 +6,8 @@
 layout ( triangles ) in;
 layout ( triangle_strip, max_vertices = 3 ) out;
 
+uniform mat4 shadowMat;
+
 #ifdef SSBO
 	layout(std140, binding = 0) buffer DrawArraysIndirectCommand {
 		int count;
@@ -34,22 +36,24 @@ in Data dataTES[];
 out Data dataGS;
 
 // seems meaningless, but god for test to reduce the number of saved triangles
-bool CheckTriangleFacing(vec4 p0, vec4 p1, vec4 p2) {
-
-	vec4 p0c = gl_ModelViewProjectionMatrix * p0; p0c /= p0c.w;
-	vec4 p1c = gl_ModelViewProjectionMatrix * p1; p1c /= p1c.w;
-	vec4 p2c = gl_ModelViewProjectionMatrix * p2; p2c /= p2c.w;
+bool CheckTriangleFacing(mat4 MVP) {
+	vec4 p0c = MVP * gl_in[0].gl_Position; p0c /= p0c.w;
+	vec4 p1c = MVP * gl_in[1].gl_Position; p1c /= p1c.w;
+	vec4 p2c = MVP * gl_in[2].gl_Position; p2c /= p2c.w;
 
 	vec3 trNormal = cross( normalize(p1c.xyz - p0c.xyz), normalize(p1c.xyz - p2c.xyz) );
 
-	return (trNormal.z < 0.0);
+	return (trNormal.z <= 0.0);
 }
 
+#define CULL_TRIANGLES 1
 
 void main() {
-	
-	//if (!CheckTriangleFacing(gl_in[0].gl_Position, gl_in[1].gl_Position, gl_in[2].gl_Position))
-		//return;
+
+#if (CULL_TRIANGLES == 1)
+	if (!CheckTriangleFacing(gl_ModelViewProjectionMatrix) && !CheckTriangleFacing(shadowMat))
+		return;
+#endif
 
 #ifdef SSBO
 	int idx = atomicAdd(count, 3);

@@ -15,12 +15,13 @@
 #include "TessMeshShaders.h"
 
 struct TeshMessConsts {
-	static constexpr int32_t UHM_TO_MESH = 64.0f; // Divider to divide UHM rect coord by to get Patch{x,y}
 	static constexpr int32_t PATCH_SIZE = 128; // must match SMFReadMap::bigSquareSize
-	static constexpr int32_t TESS_LEVEL = 16; // should be a power of two, less or equal than GL_MAX_TESS_GEN_LEVEL (64)
+	static constexpr int32_t TESS_LEVEL = 32; // should be a power of two, less or equal than GL_MAX_TESS_GEN_LEVEL (64)
 	static constexpr int32_t PATCH_RC_QUAD_NUM = PATCH_SIZE / TESS_LEVEL; // number of quads in one row/column of the patch
 	static constexpr int32_t PATCH_VERT_NUM = 4 * PATCH_RC_QUAD_NUM * PATCH_RC_QUAD_NUM;  // number of vertices in whole patch
 	static constexpr int32_t TESS_TRIANGLE_NUM_MAX = (PATCH_RC_QUAD_NUM * PATCH_RC_QUAD_NUM) * (TESS_LEVEL * TESS_LEVEL) * 2;
+
+	static constexpr float   UHM_TO_MESH = static_cast<float>(PATCH_SIZE); // Divider to divide UHM rect coord by to get Patch{x,y}
 };
 
 struct DrawArraysIndirectCommand {
@@ -48,11 +49,14 @@ public:
 		return
 			globalRendering->haveGLSL &&
 			readMap->GetGroundDrawer()->UseAdvShading() &&
+
+			GLEW_ARB_geometry_shader4 &&
 			GLEW_ARB_vertex_buffer_object &&
-//			GLEW_ARB_explicit_attrib_location &&
-//			GLEW_ARB_vertex_array_object &&			// glBindVertexArray
-			GLEW_ARB_tessellation_shader &&
-			GLEW_ARB_shader_image_load_store; // for glMemoryBarrier()
+
+			GLEW_ARB_texture_float && //needed for Heightmap
+			GLEW_ARB_texture_non_power_of_two &&  //needed for Heightmap
+
+			GLEW_ARB_tessellation_shader;
 	};
 public:
 	virtual void Update() = 0;
@@ -107,8 +111,12 @@ class CTessMeshCacheSSBO : public CTessMeshCache
 public:
 	static bool Supported() {
 		return CTessMeshCache::Supported() &&
-			GLEW_ARB_geometry_shader4 &&
-			GLEW_ARB_shader_storage_buffer_object;
+			GLEW_ARB_framebuffer_object &&
+			GLEW_EXT_framebuffer_blit &&
+			GLEW_ARB_texture_rg &&
+			GLEW_ARB_shader_storage_buffer_object &&
+			GLEW_ARB_compute_shader &&
+			GLEW_ARB_shader_image_load_store; // for glMemoryBarrier()
 	};
 public:
 	//, const GLenum meshTessBufferType = GL_SHADER_STORAGE_BUFFER
@@ -122,6 +130,12 @@ public:
 private:
 	DrawArraysIndirectCommand daicZero;
 	std::vector<GLuint> meshTessDAIBs;
+
+	int numMips;
+
+	GLuint logTex; //Laplacian of Gaussian, high-Z texture
+	std::vector<GLuint> logImages; //Laplacian of Gaussian Images;
+
 	bool drawIndirect;
 };
 

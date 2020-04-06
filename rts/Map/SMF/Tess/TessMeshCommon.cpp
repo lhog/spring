@@ -8,6 +8,7 @@
 #include "TessMeshCommon.h"
 #include "Rendering/Shaders/Shader.h"
 #include "Rendering/Shaders/ShaderHandler.h"
+#include "Map/HeightMapTexture.h"
 #include "System/Log/ILog.h"
 
 CTessMeshCacheTF::CTessMeshCacheTF(const int numPatchesX, const int numPatchesZ):
@@ -122,8 +123,6 @@ CTessMeshCacheSSBO::CTessMeshCacheSSBO(const int numPatchesX, const int numPatch
 {
 	drawIndirect = GLEW_ARB_draw_indirect;
 
-	LOG("CTessMeshCacheSSBO");
-
 	meshTessDAIBs.resize(numPatchesX * numPatchesZ);
 
 	for (auto i = 0; i < numPatchesX * numPatchesZ; ++i) {
@@ -136,14 +135,40 @@ CTessMeshCacheSSBO::CTessMeshCacheSSBO(const int numPatchesX, const int numPatch
 	memset(&daicZero, 0, sizeof(DrawArraysIndirectCommand));
 	daicZero.primCount = 1u;
 
+	/////////////
+	numMips = static_cast<int>(std::log2(TeshMessConsts::TESS_LEVEL));
+	glGenTextures(1, &logTex);
+
+	glActiveTexture(GL_TEXTURE0);
+	GLint prevTexID;
+	glGetIntegerv(GL_TEXTURE_BINDING_2D, &prevTexID);
+	glBindTexture(GL_TEXTURE_2D, logTex);
+
+	glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_BASE_LEVEL, 0);
+	glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_MAX_LEVEL, numMips - 1);
+
+	glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_WRAP_S, GL_CLAMP_TO_EDGE);
+	glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_WRAP_T, GL_CLAMP_TO_EDGE);
+
+	glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_MIN_FILTER, GL_NEAREST);
+	glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_MAG_FILTER, GL_NEAREST);
+
+	if (GLEW_ARB_texture_storage)
+		glTexStorage2D(GL_TEXTURE_2D, numMips, GL_R32F, mapDims.mapx, mapDims.mapy);
+	else {
+		for (int mipNum = 0; mipNum < numMips; ++mipNum)
+			glTexImage2D(GL_TEXTURE_2D, mipNum, GL_R32F, std::min(mapDims.mapx >> mipNum, 1), std::min(mapDims.mapy >> mipNum, 1), 0, GL_RED, GL_FLOAT, nullptr);
+	}
+	glBindTexture(GL_TEXTURE_2D, prevTexID);
+
+	/////////////
+
 	tessMeshShader = std::unique_ptr<CTessMeshShaderSSBO>(new CTessMeshShaderSSBO(SQUARE_SIZE * mapDims.mapx, SQUARE_SIZE * mapDims.mapy));
 	tessMeshShader->SetMaxTessValue(TeshMessConsts::TESS_LEVEL);
-
-	LOG("CTessMeshCacheSSBO 2");
-
 }
 
 CTessMeshCacheSSBO::~CTessMeshCacheSSBO(){
+	glDeleteTextures(1, &logTex);
 }
 
 void CTessMeshCacheSSBO::Update(){
@@ -162,6 +187,7 @@ void CTessMeshCacheSSBO::Update(){
 
 	tessMeshShader->Activate();
 	tessMeshShader->SetScreenDims();
+	tessMeshShader->SetShadowMatrix();
 
 	GLuint npwNow = 0u;
 	GLuint npwTotal = 0u;
@@ -184,7 +210,7 @@ void CTessMeshCacheSSBO::Update(){
 				glBeginQuery(GL_PRIMITIVES_GENERATED, tessMeshQuery);
 
 			glDrawArrays(GL_PATCHES, 0, TeshMessConsts::PATCH_VERT_NUM);
-			glMemoryBarrier(GL_SHADER_STORAGE_BARRIER_BIT);
+			//glMemoryBarrier(GL_SHADER_STORAGE_BARRIER_BIT);
 
 			if (runQueries) {
 				glEndQuery(GL_PRIMITIVES_GENERATED);

@@ -37,7 +37,7 @@ LOG_REGISTER_SECTION_GLOBAL(LOG_SECTION_TESS)
 #define LOG_SECTION_CURRENT LOG_SECTION_TESS
 
 CTessMeshDrawer::CTessMeshDrawer(CSMFGroundDrawer* gd)
-	: CEventClient("[CTessMeshDrawer]", 271989+1, false),
+	: CEventClient("[CTessMeshDrawer]", 2718965 + 1, false), //after heightmap update
 	smfGroundDrawer(gd)
 {
 	eventHandler.AddClient(this);
@@ -63,7 +63,7 @@ CTessMeshDrawer::CTessMeshDrawer(CSMFGroundDrawer* gd)
 	if ((CTessMeshCacheSSBO::Supported()))
 		tessMeshCache = std::unique_ptr<CTessMeshCacheSSBO>(new CTessMeshCacheSSBO(numPatchesX, numPatchesZ));
 
-	//tessMeshCache->SetRunQueries(true);
+	tessMeshCache->SetRunQueries(true);
 }
 
 CTessMeshDrawer::~CTessMeshDrawer()
@@ -81,6 +81,10 @@ void CTessMeshDrawer::DrawMesh(const DrawPass::e& drawPass)
 	}
 }
 
+void CTessMeshDrawer::DrawInMiniMap() {
+	//TODO: place debug
+}
+
 void CTessMeshDrawer::DrawBorderMesh(const DrawPass::e& drawPass)
 {
 
@@ -95,13 +99,21 @@ bool CTessMeshDrawer::Supported() {
 
 void CTessMeshDrawer::UnsyncedHeightMapUpdate(const SRectangle& rect)
 {
-	//LOG("CTessMeshDrawer::UnsyncedHeightMapUpdate DF=%d Rect{%d, %d, %d, %d}", globalRendering->drawFrame, rect.x1, rect.x2, rect.y1, rect.y2);
+	/*
+	LOG("CTessMeshDrawer::UnsyncedHeightMapUpdate DF=%d Rect{%d, %d, %d, %d} x={%d, %d} z={%d, %d}", globalRendering->drawFrame, rect.x1, rect.x2, rect.y1, rect.y2,\
+		static_cast<int>(std::floor(rect.x1 / TeshMessConsts::UHM_TO_MESH)), static_cast<int>(std::ceil(rect.x2 / TeshMessConsts::UHM_TO_MESH)), \
+		static_cast<int>(std::floor(rect.z1 / TeshMessConsts::UHM_TO_MESH)), static_cast<int>(std::ceil(rect.z2 / TeshMessConsts::UHM_TO_MESH))  \
+	);
+	*/
 
-	for (int x = std::floor(rect.x1 / TeshMessConsts::UHM_TO_MESH); x <= std::ceil(rect.x2 / TeshMessConsts::UHM_TO_MESH); ++x)
-	for (int z = std::floor(rect.z1 / TeshMessConsts::UHM_TO_MESH); z <= std::ceil(rect.z2 / TeshMessConsts::UHM_TO_MESH); ++z) {
-		//tessMeshCache->RequestTesselation(x, z);
-		tessMeshCache->RequestTesselation();
+	for (int x = static_cast<int>(std::floor(rect.x1 / TeshMessConsts::UHM_TO_MESH)); x <= static_cast<int>(std::ceil(rect.x2 / TeshMessConsts::UHM_TO_MESH)); ++x)
+	for (int z = static_cast<int>(std::floor(rect.z1 / TeshMessConsts::UHM_TO_MESH)); z <= static_cast<int>(std::ceil(rect.z2 / TeshMessConsts::UHM_TO_MESH)); ++z) {
+		tessMeshCache->RequestTesselation(x, z);
 	}
+}
+
+void CTessMeshDrawer::SunChanged() {
+	tessMeshCache->RequestTesselation();
 }
 
 void CTessMeshDrawer::Update()
