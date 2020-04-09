@@ -90,8 +90,9 @@ void CTessMeshDrawer::UnsyncedHeightMapUpdate(const SRectangle& rect)
 	for (int z = static_cast<int>(std::floor(rect.z1 / TeshMessConsts::UHM_TO_MESH)); z <= static_cast<int>(std::ceil(rect.z2 / TeshMessConsts::UHM_TO_MESH)); ++z) {
 		tessMeshCache->TesselatePatch(x, z);
 	}
-
-	tessMeshCache->Update();
+	//LOG("CTessMeshDrawer::UnsyncedHeightMapUpdate %d", globalRendering->drawFrame);
+	//tessMeshCache->Update();
+	// ^^^^^ No need CTessMeshDrawer::Update() is called next
 }
 
 void CTessMeshDrawer::SunChanged() {
@@ -137,7 +138,7 @@ void CTessMeshDrawer::Update()
 		lastCamDir = camDir;
 		tessMeshCache->CameraMoved();;
 	}
-
+	//LOG("CTessMeshDrawer::Update %d", globalRendering->drawFrame);
 	tessMeshCache->Update();
 }
 

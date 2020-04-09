@@ -256,14 +256,21 @@ public:
 		}
 
 		int smfMeshDrawerArg = -1;
-		int roamPatchModeArg = -1;
+		int smfMeshDrawerParam = -1;
 
-		sscanf((action.GetArgs()).c_str(), "%i %i", &smfMeshDrawerArg, &roamPatchModeArg);
+		sscanf((action.GetArgs()).c_str(), "%i %i", &smfMeshDrawerArg, &smfMeshDrawerParam);
 
 		smfDrawer->SwitchMeshDrawer(smfMeshDrawerArg);
 
-		if (smfMeshDrawerArg == SMF_MESHDRAWER_ROAM && roamPatchModeArg >= 0)
-			Patch::SwitchRenderMode(roamPatchModeArg);
+		if (smfMeshDrawerParam >= 0) {
+			switch (smfMeshDrawerParam) {
+				case SMF_MESHDRAWER_ROAM:
+					Patch::SwitchRenderMode(smfMeshDrawerParam); break;
+				//case SMF_MESHDRAWER_ROAM:
+					//Patch::SwitchRenderMode(smfMeshDrawerParam); break;
+				default: {};
+			}
+		};
 
 		return true;
 	}

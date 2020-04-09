@@ -23,7 +23,7 @@ CTessMeshShader::CTessMeshShader(const int mapX, const int mapZ) :
 
 CTessMeshShader::~CTessMeshShader() {
 	//seems like engine doesn't do it
-	#pragma message ( "TODO: recheck" __FILE__  __LINE__ )
+	#pragma message "TODO: recheck" __FILE__  __LINE__ "\n\0"
 	glDeleteShader(vsSO->GetObjID());
 	glDeleteShader(tcsSO->GetObjID());
 	glDeleteShader(tesSO->GetObjID());
@@ -45,7 +45,7 @@ void CTessMeshShader::SetSquareCoord(const int sx, const int sz) {
 	shaderPO->SetUniform("texSquare", sx, sz);
 }
 
-void CTessMeshShader::SetMaxTessValue(float maxTess) {
+void CTessMeshShader::SetMaxTessValue(int maxTess) {
 	bool alreadyBound = shaderPO->IsBound();
 
 	if (!alreadyBound) shaderPO->Enable();
@@ -126,7 +126,7 @@ CTessHMVariancePass::CTessHMVariancePass(const int hmX, const int hmY, const int
 	glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_MIN_FILTER, GL_NEAREST_MIPMAP_NEAREST);
 	glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_MAG_FILTER, GL_NEAREST);
 
-	if (GLEW_ARB_texture_storage && false)
+	if (GLEW_ARB_texture_storage)
 		glTexStorage2D(GL_TEXTURE_2D, numMips, GL_R32F, hmX, hmY);
 	else {
 		for (int mipLvl = 0; mipLvl < numMips; ++mipLvl)
@@ -153,7 +153,7 @@ CTessHMVariancePass::~CTessHMVariancePass() {
 	glDeleteTextures(1, &logTexID);
 
 	shaderHandler->ReleaseProgramObjects(poClass);
-	#pragma message ( "TODO: recheck" __FILE__  __LINE__ )
+	#pragma message "TODO: recheck" __FILE__  __LINE__ "\n\0"
 	glDeleteShader(hmvSO->GetObjID());
 }
 

@@ -21,7 +21,7 @@ public:
 	virtual void UnbindTextures();
 
 	virtual void SetSquareCoord(const int sx, const int sz);
-	virtual void SetMaxTessValue(float maxTess);
+	virtual void SetMaxTessValue(int maxTess);
 	virtual void SetCommonUniforms();
 protected:
 	const int mapX;

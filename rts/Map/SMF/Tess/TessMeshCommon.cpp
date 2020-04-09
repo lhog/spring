@@ -31,8 +31,6 @@ CTessMeshCacheSSBO::CTessMeshCacheSSBO(const int hmX, const int hmZ) :
 	daicZero.primCount = 1u;
 
 	tessMeshShader = std::unique_ptr<CTessMeshShaderSSBO>(new CTessMeshShaderSSBO(SQUARE_SIZE * mapDims.mapx, SQUARE_SIZE * mapDims.mapy));
-	tessMeshShader->SetMaxTessValue(TeshMessConsts::TESS_LEVEL);
-
 	tessHMVarPass = std::unique_ptr<CTessHMVariancePass>(new CTessHMVariancePass(hmX, hmZ, TeshMessConsts::TESS_LEVEL));
 }
 
@@ -43,11 +41,16 @@ CTessMeshCacheSSBO::~CTessMeshCacheSSBO(){
 }
 
 void CTessMeshCacheSSBO::Update(){
-	if (!cameraMoved && std::find(hmChanged.begin(), hmChanged.end(), true) == hmChanged.end()) //nothing to do
+	bool hmChangesReported = std::find(hmChanged.begin(), hmChanged.end(), true) != hmChanged.end();
+
+	if (!hmChangesReported && !cameraMoved) //nothing to do
 		return;
 
 	/////////////////////////////////////////
-	tessHMVarPass->Run(heightMapTexture->GetTextureID());
+	// TODO make per-PATCH ?
+	if (hmChangesReported) {
+		tessHMVarPass->Run(heightMapTexture->GetTextureID());
+	}
 	/////////////////////////////////////////
 
 	glEnableClientState(GL_VERTEX_ARRAY);
@@ -64,12 +67,13 @@ void CTessMeshCacheSSBO::Update(){
 	tessMeshShader->BindTextures(tessHMVarPass->GetTextureID());
 	//tessMeshShader->BindTextures(heightMapTexture->GetTextureID());
 	tessMeshShader->SetCommonUniforms();
+	tessMeshShader->SetMaxTessValue(TeshMessConsts::TESS_LEVEL);
 
 	GLuint npwNow = 0u;
 	GLuint npwTotal = 0u;
 
 	for (int i = 0; i < numPatchesX * numPatchesZ; ++i) {
-		if (hmChanged[0] || hmChanged[i + 1]) {
+		if (cameraMoved || hmChanged[i]) {
 			int x = i / numPatchesZ;
 			int z = i % numPatchesZ;
 
@@ -92,27 +96,19 @@ void CTessMeshCacheSSBO::Update(){
 				glEndQuery(GL_PRIMITIVES_GENERATED);
 				glGetQueryObjectuiv(tessMeshQuery, GL_QUERY_RESULT, &npwNow); //in triangles
 				npwTotal += npwNow;
-				/*
-				DrawArraysIndirectCommand daicTmp;
-				glBindBuffer(GL_DRAW_INDIRECT_BUFFER, meshTessDAIBs[i]);
-				glGetBufferSubData(GL_DRAW_INDIRECT_BUFFER, 0, sizeof(DrawArraysIndirectCommand), &daicTmp);
-				glBindBuffer(GL_DRAW_INDIRECT_BUFFER, 0);
-
-				LOG("daicTmp[%d] = %d || %d", i, daicTmp.count, daicTmp.primCount);
-				*/
 			}
 
 			glBindBufferBase(GL_SHADER_STORAGE_BUFFER, 0, 0);
 			glBindBufferBase(GL_SHADER_STORAGE_BUFFER, 1, 0);
 
-			hmChanged[i + 1] = false;
+			hmChanged[i] = false;
 		}
 	}
 
-	if (runQueries && hmChanged[0])
-		LOG("[Tesselation Shader:SSBO-Backend] Total Number of primitives written: %d", npwTotal);
+	cameraMoved = false;
 
-	hmChanged[0] = false;
+	if (runQueries)
+		LOG("[Tesselation Shader:SSBO-Backend] Total Number of primitives written: %d", npwTotal);
 
 	glDisable(GL_RASTERIZER_DISCARD);
 	glEnable(GL_CULL_FACE);
@@ -156,6 +152,7 @@ void CTessMeshCacheSSBO::DrawMesh(const int px, const int pz){
 }
 
 void CTessMeshCache::CameraMoved() {
+	cameraMoved = true;
 }
 
 void CTessMeshCache::TesselatePatch(const int px, const int pz) {

@@ -3,8 +3,8 @@
 
 layout(vertices = 4) out;
 
-//uniform int maxTessValue;
-const int maxTessValue = 16;
+uniform int maxTessValue;
+//const int maxTessValue = 64;
 uniform ivec2 screenDims;
 uniform ivec2 mapDims;
 
@@ -82,7 +82,7 @@ float ScreenSpaceFactor(int i0, int i1) {
 
 //#define UV_OK(uv) all(bvec4( greaterThanEqual(uv, vec2(0.0)), lessThanEqual(uv, vec2(1.0)) ))
 #define UV_OK(uv) true
-#define GET_VARIANCE(uv, ml) (textureLod(hmVarTex, uv, ml).x / 4.0)
+#define GET_VARIANCE(uv, ml) (textureLod(hmVarTex, uv, ml).x / 16.0)
 #define VARIANCE_TO_TESSLEVEL(v) mix(1.0, float(maxTessValue), clamp(v, 0.0, 1.0))
 //      0
 // (0)-----(3)
