@@ -4,6 +4,7 @@
 #define _TESS_MESH_SHADERS_H_
 
 #include "Rendering/GL/myGL.h"
+#include "Rendering/Shaders/Shader.h"
 #include "Rendering/Shaders/ShaderHandler.h"
 
 #include <string>
@@ -13,12 +14,15 @@ public:
 	CTessMeshShader(const int mapX, const int mapZ);
 	virtual ~CTessMeshShader();
 public:
-	virtual void Activate();
+	virtual void Activate() { shaderPO->Enable(); }
+	virtual void Deactivate() { shaderPO->Disable(); }
+
+	virtual void BindTextures(const GLuint hmVarTexID);
+	virtual void UnbindTextures();
+
 	virtual void SetSquareCoord(const int sx, const int sz);
 	virtual void SetMaxTessValue(float maxTess);
-	virtual void SetScreenDims();
-	virtual void SetShadowMatrix();
-	virtual void Deactivate();
+	virtual void SetCommonUniforms();
 protected:
 	const int mapX;
 	const int mapZ;
@@ -51,24 +55,26 @@ private:
 	const std::string poClass = "[TessMeshDrawer-SSBO]";
 };
 
-class CTessHMVarianceShader {
+class CTessHMVariancePass {
 public:
-	CTessHMVarianceShader(const GLuint logTexID, const int lsx = 32, const int lsy = 32, const int lsz = 1);
-	~CTessHMVarianceShader();
-	void Activate();
-	void BindTextureLevel(const int lvl);
-	void UnbindTextureLevel();
-	void Deactivate();
+	CTessHMVariancePass(const int hmX, const int hmY, const int tessLevelMax, const int lsx = 32, const int lsy = 32, const int lsz = 1);
+	~CTessHMVariancePass();
+	void Run(const GLuint hmTexureID);
+	GLuint GetTextureID() { return logTexID; };
 private:
 	GLint prevTexID;
 	GLuint logTexID;
 
-	int curMipLevel;
+	int numMips;
 
-	int lsx, lsy, lsz;
+	const int hmX;
+	const int hmY;
+	const int tessLevelMax;
+	const int lsx, lsy, lsz;
+
 	Shader::IShaderObject* hmvSO;
 	Shader::IProgramObject* hmvPO;
-	const std::string poClass = "[TessMeshDrawer-HMVar]";
+	const std::string poClass = "[TessMeshDrawer-hmVar]";
 };
 
 

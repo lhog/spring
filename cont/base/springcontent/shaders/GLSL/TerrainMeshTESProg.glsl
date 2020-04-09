@@ -4,7 +4,7 @@
 
 layout( quads, equal_spacing, ccw ) in;
 
-uniform sampler2D heightMap;
+uniform sampler2D hmVarTex;
 
 struct Data {
 	vec2 mapUV;
@@ -22,7 +22,8 @@ void main() {
 
 	dataTES.mapUV = LERP4(dataTCS, mapUV);
 
-	gl_Position.y = textureLod(heightMap, dataTES.mapUV, 0.0).x;
+	gl_Position.y = textureLod(hmVarTex, dataTES.mapUV, 0.0).x;
+	//gl_Position.y = 0.0 + 20.0*textureLod(hmVarTex, dataTES.mapUV, 255.0).x;
 
 	gl_Position = gl_Position;
 }

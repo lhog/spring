@@ -18,15 +18,6 @@
 
 #include <cmath>
 
-#define DEBUG_QUADS_RENDERING
-
-#ifdef DEBUG_QUADS_RENDERING
-	#define GL_RENDERING_PRIMITIVE GL_QUADS
-#else
-	#define GL_RENDERING_PRIMITIVE GL_PATCHES
-#endif
-
-
 #define LOG_SECTION_TESS "TessMeshDrawer"
 LOG_REGISTER_SECTION_GLOBAL(LOG_SECTION_TESS)
 
@@ -61,9 +52,9 @@ CTessMeshDrawer::CTessMeshDrawer(CSMFGroundDrawer* gd)
 		tessMeshCache = std::unique_ptr<CTessMeshCacheTF>(new CTessMeshCacheTF(numPatchesX, numPatchesZ));
 */
 	if ((CTessMeshCacheSSBO::Supported()))
-		tessMeshCache = std::unique_ptr<CTessMeshCacheSSBO>(new CTessMeshCacheSSBO(numPatchesX, numPatchesZ));
+		tessMeshCache = std::unique_ptr<CTessMeshCacheSSBO>(new CTessMeshCacheSSBO(mapDims.mapx, mapDims.mapy));
 
-	tessMeshCache->SetRunQueries(true);
+	//tessMeshCache->SetRunQueries(true);
 }
 
 CTessMeshDrawer::~CTessMeshDrawer()
@@ -108,12 +99,12 @@ void CTessMeshDrawer::UnsyncedHeightMapUpdate(const SRectangle& rect)
 
 	for (int x = static_cast<int>(std::floor(rect.x1 / TeshMessConsts::UHM_TO_MESH)); x <= static_cast<int>(std::ceil(rect.x2 / TeshMessConsts::UHM_TO_MESH)); ++x)
 	for (int z = static_cast<int>(std::floor(rect.z1 / TeshMessConsts::UHM_TO_MESH)); z <= static_cast<int>(std::ceil(rect.z2 / TeshMessConsts::UHM_TO_MESH)); ++z) {
-		tessMeshCache->RequestTesselation(x, z);
+		tessMeshCache->TesselatePatch(x, z);
 	}
 }
 
 void CTessMeshDrawer::SunChanged() {
-	tessMeshCache->RequestTesselation();
+	tessMeshCache->TesselatePatch();
 }
 
 void CTessMeshDrawer::Update()
@@ -149,11 +140,11 @@ void CTessMeshDrawer::Update()
 			lastCamPos.distance(camPos), math::fabs(lastCamDir.dot(camDir)) \
 		);
 
-		LOG("RequestTesselation() %f || %f || drawFrame = %d", lastCamPos.distance(camPos), math::fabs(lastCamDir.dot(camDir)), globalRendering->drawFrame);
+		LOG("TesselatePatch() %f || %f || drawFrame = %d", lastCamPos.distance(camPos), math::fabs(lastCamDir.dot(camDir)), globalRendering->drawFrame);
 */
 		lastCamPos = camPos;
 		lastCamDir = camDir;
-		tessMeshCache->RequestTesselation();
+		tessMeshCache->TesselatePatch();
 	}
 
 	tessMeshCache->Update();

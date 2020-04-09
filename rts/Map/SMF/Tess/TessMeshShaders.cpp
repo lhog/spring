@@ -1,12 +1,15 @@
 /* This file is part of the Spring engine (GPL v2 or later), see LICENSE.html */
 
 #include "Rendering/GlobalRendering.h"
-#include "Rendering/Shaders/Shader.h"
 #include "Rendering/ShadowHandler.h"
-#include "Map/HeightMapTexture.h"
+
 #include "TessMeshShaders.h"
 
 #include "System/Log/ILog.h"
+
+#include <GL/glew.h>
+#include <algorithm>
+#include <cmath>
 
 CTessMeshShader::CTessMeshShader(const int mapX, const int mapZ) :
 	mapX(mapX),
@@ -20,18 +23,21 @@ CTessMeshShader::CTessMeshShader(const int mapX, const int mapZ) :
 
 CTessMeshShader::~CTessMeshShader() {
 	//seems like engine doesn't do it
-	#pragma message ( "TODO: recheck", __FILE__, __LINE__ )
+	#pragma message ( "TODO: recheck" __FILE__  __LINE__ )
 	glDeleteShader(vsSO->GetObjID());
 	glDeleteShader(tcsSO->GetObjID());
 	glDeleteShader(tesSO->GetObjID());
 	//glDeleteShader(fsSO->GetObjID());
 }
 
-void CTessMeshShader::Activate() {
+void CTessMeshShader::BindTextures(const GLuint hmVarTexID) {
 	glActiveTexture(GL_TEXTURE0);
 	glGetIntegerv(GL_TEXTURE_BINDING_2D, &prevTexID);
-	glBindTexture(GL_TEXTURE_2D, heightMapTexture->GetTextureID());
-	shaderPO->Enable();
+	glBindTexture(GL_TEXTURE_2D, hmVarTexID);
+}
+
+void CTessMeshShader::UnbindTextures() {
+	glActiveTexture(GL_TEXTURE0); glBindTexture(GL_TEXTURE_2D, prevTexID);
 }
 
 void CTessMeshShader::SetSquareCoord(const int sx, const int sz) {
@@ -44,35 +50,23 @@ void CTessMeshShader::SetMaxTessValue(float maxTess) {
 
 	if (!alreadyBound) shaderPO->Enable();
 
-	shaderPO->SetUniform("maxTessValue", maxTess);
+		shaderPO->SetUniform("maxTessValue", maxTess);
 
 	if (!alreadyBound) shaderPO->Disable();
 }
 
-void CTessMeshShader::SetScreenDims() {
+void CTessMeshShader::SetCommonUniforms() {
 	bool alreadyBound = shaderPO->IsBound();
 
 	if (!alreadyBound) shaderPO->Enable();
 
-	shaderPO->SetUniform("screenDims", globalRendering->viewSizeX, globalRendering->viewSizeY);
+		shaderPO->SetUniform("screenDims", globalRendering->viewSizeX, globalRendering->viewSizeY);
+		shaderPO->SetUniformMatrix4x4("shadowMat", false, shadowHandler.GetShadowMatrixRaw());
 
 	if (!alreadyBound) shaderPO->Disable();
 }
 
-void CTessMeshShader::SetShadowMatrix() {
-	bool alreadyBound = shaderPO->IsBound();
 
-	if (!alreadyBound) shaderPO->Enable();
-
-	shaderPO->SetUniformMatrix4x4("shadowMat", false, shadowHandler.GetShadowMatrixRaw());
-
-	if (!alreadyBound) shaderPO->Disable();
-}
-
-void CTessMeshShader::Deactivate() {
-	shaderPO->Disable();
-	glActiveTexture(GL_TEXTURE0); glBindTexture(GL_TEXTURE_2D, prevTexID);
-}
 
 /////////////////////////////////////////////////////////////////////////////////
 
@@ -97,8 +91,8 @@ CTessMeshShaderTF::CTessMeshShaderTF(const int mapX, const int mapZ):
 	shaderPO->Link();
 
 	shaderPO->Enable();
-	shaderPO->SetUniform("mapDims", mapX, mapZ);
-	shaderPO->SetUniform("heightMap", 0);
+		shaderPO->SetUniform("mapDims", mapX, mapZ);
+		shaderPO->SetUniform("hmVarTex", 0);
 	shaderPO->Disable();
 }
 
@@ -127,8 +121,8 @@ CTessMeshShaderSSBO::CTessMeshShaderSSBO(const int mapX, const int mapZ) :
 	shaderPO->Link();
 
 	shaderPO->Enable();
-	shaderPO->SetUniform("mapDims", mapX, mapZ);
-	shaderPO->SetUniform("heightMap", 0);
+		shaderPO->SetUniform("mapDims", mapX, mapZ);
+		shaderPO->SetUniform("hmVarTex", 0);
 	shaderPO->Disable();
 }
 
@@ -137,66 +131,102 @@ CTessMeshShaderSSBO::~CTessMeshShaderSSBO() {
 	glDeleteShader(gsSO->GetObjID());
 }
 
-CTessHMVarianceShader::CTessHMVarianceShader(const GLuint logTexID, const int lsx, const int lsy, const int lsz):
-	logTexID(logTexID),
+/////////////////////////////////////////////////////////////////////////////////
+
+CTessHMVariancePass::CTessHMVariancePass(const int hmX, const int hmY, const int tessLevelMax, const int lsx, const int lsy, const int lsz):
+	hmX(hmX), hmY(hmY),
+	tessLevelMax(tessLevelMax),
 	lsx(lsx), lsy(lsy), lsz(lsz)
 {
-	hmvSO = shaderHandler->CreateShaderObject("GLSL/HMVarianceCSProg.glsl", "", GL_COMPUTE_SHADER);
+	assert(lsx * lsy * lsz <= 1024); //minimum GL_MAX_COMPUTE_WORK_GROUP_INVOCATIONS guaranteed by spec
+	/////////////
+	numMips = static_cast<int>(std::log2(tessLevelMax)) + 1;
+	glGenTextures(1, &logTexID);
+
+	GLint prevTexID;
+	glActiveTexture(GL_TEXTURE0);
+	glGetIntegerv(GL_TEXTURE_BINDING_2D, &prevTexID);
+	glBindTexture(GL_TEXTURE_2D, logTexID);
+
+	glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_BASE_LEVEL, 0);
+	glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_MAX_LEVEL, numMips - 1);
+
+	glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_WRAP_S, GL_CLAMP_TO_EDGE);
+	glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_WRAP_T, GL_CLAMP_TO_EDGE);
+
+	glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_MIN_FILTER, GL_NEAREST_MIPMAP_NEAREST);
+	glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_MAG_FILTER, GL_NEAREST);
+
+	if (GLEW_ARB_texture_storage && false)
+		glTexStorage2D(GL_TEXTURE_2D, numMips, GL_R32F, hmX, hmY);
+	else {
+		for (int mipLvl = 0; mipLvl < numMips; ++mipLvl)
+			glTexImage2D(GL_TEXTURE_2D, mipLvl, GL_R32F, std::max(hmX >> mipLvl, 1), std::max(hmY >> mipLvl, 1), 0, GL_RED, GL_FLOAT, nullptr);
+	}
+
+	glBindTexture(GL_TEXTURE_2D, prevTexID);
+
+	/////////////
+	hmvPO = shaderHandler->CreateProgramObject(poClass, "hmVar-GLSL", false);
+	hmvSO = shaderHandler->CreateShaderObject("GLSL/HeightMapVarianceCSProg.glsl", "", GL_COMPUTE_SHADER);
 	hmvPO->AttachShaderObject(hmvSO);
 	hmvPO->SetFlag("LSX", lsx);
 	hmvPO->SetFlag("LSY", lsy);
 	hmvPO->SetFlag("LSZ", lsz);
 
 	hmvPO->Link();
+	hmvPO->Enable();
+		hmvPO->SetUniform("hmTex", 0);
+	hmvPO->Disable();
 }
 
-CTessHMVarianceShader::~CTessHMVarianceShader() {
+CTessHMVariancePass::~CTessHMVariancePass() {
+	glDeleteTextures(1, &logTexID);
+
 	shaderHandler->ReleaseProgramObjects(poClass);
-	#pragma message ( "TODO: recheck", __FILE__, __LINE__ )
+	#pragma message ( "TODO: recheck" __FILE__  __LINE__ )
 	glDeleteShader(hmvSO->GetObjID());
 }
 
-void CTessHMVarianceShader::Activate() {
+void CTessHMVariancePass::Run(const GLuint hmTexureID) {
+	GLint prevTexID;
+
 	glActiveTexture(GL_TEXTURE0);
 	glGetIntegerv(GL_TEXTURE_BINDING_2D, &prevTexID);
-	glBindTexture(GL_TEXTURE_2D, logTexID);
+
+	//keep UHM texture bound throughout whole hmvPO pass to make OpenGL Debug happier
+	glBindTexture(GL_TEXTURE_2D, hmTexureID);
 	hmvPO->Enable();
-}
 
-void CTessHMVarianceShader::BindTextureLevel(const int lvl) {
-	curMipLevel = lvl;
+	/////
+	// Implentation note. The below is slightly incorrect:
+	// mipLvl == -1 is supposed to create centered even sized heightmap, instead of engine's hm{X,Y}+1 stupidity
+	// mipLvl ==  0, should have same size as centered even sized heightmap, but due to mipmap requirements it's twice less
+	// Since we run hiZ() pass later on and high frequency details are lost anyway, I hope twice less size won't break anything
+	////
 
-	if (curMipLevel == -1) {
-		glActiveTexture(GL_TEXTURE0);
-		glGetIntegerv(GL_TEXTURE_BINDING_2D, &prevTexID);
-		glBindTexture(GL_TEXTURE_2D, heightMapTexture->GetTextureID()); //source
-	} else {
-		glBindImageTexture(0, logTexID, curMipLevel, GL_FALSE, 0, GL_READ_ONLY, GL_R32F); //source
-	}
+	for (int mipLvl = -1; mipLvl < numMips - 1; ++mipLvl) {
+		hmvPO->SetUniform("mipLvl", mipLvl);
 
-	glBindImageTexture(1, logTexID, curMipLevel + 1, GL_FALSE, 0, GL_WRITE_ONLY, GL_R32F); //destination
+		if (mipLvl >= 0) {
+			glBindImageTexture(0, logTexID, mipLvl, false, 0, GL_READ_ONLY, GL_R32F);
+		}
 
-	bool alreadyBound = hmvPO->IsBound();
-	if (!alreadyBound) hmvPO->Enable();
+		glBindImageTexture(1, logTexID, mipLvl + 1, false, 0, GL_WRITE_ONLY, GL_R32F);
 
-	hmvPO->SetUniform("lvl", curMipLevel);
+		auto inImgWidth  = std::floor(static_cast<float>(hmX) / static_cast<float>(std::max(mipLvl + 1, 1))); //floor() per spec
+		auto inImgHeight = std::floor(static_cast<float>(hmY) / static_cast<float>(std::max(mipLvl + 1, 1)));
 
-	if (!alreadyBound) hmvPO->Disable();
-}
+		auto dispatchX = static_cast<GLuint>(ceil( inImgWidth / static_cast<float>(lsx)));
+		auto dispatchY = static_cast<GLuint>(ceil(inImgHeight / static_cast<float>(lsy)));
 
-void CTessHMVarianceShader::UnbindTextureLevel() {
-	if (curMipLevel == -1) {
-		glActiveTexture(GL_TEXTURE0);
-		glBindTexture(GL_TEXTURE_2D, prevTexID); //source
-	} else {
-		glBindImageTexture(0, 0, curMipLevel, GL_FALSE, 0, GL_READ_ONLY, GL_R32F); //source
-	}
+		// LOG("glDispatchCompute %d %d %f %f %d %d %d %d", hmX, hmY, inImgWidth, inImgHeight, lsx, lsy, dispatchX, dispatchY);
 
-	glBindImageTexture(1, 0, curMipLevel + 1, GL_FALSE, 0, GL_WRITE_ONLY, GL_R32F); //destination
-}
+		glDispatchCompute(dispatchX, dispatchY, 1);
+		glMemoryBarrier(GL_SHADER_IMAGE_ACCESS_BARRIER_BIT);
+	};
 
-void CTessHMVarianceShader::Deactivate() {
 	hmvPO->Disable();
-	glActiveTexture(GL_TEXTURE0);
+
 	glBindTexture(GL_TEXTURE_2D, prevTexID);
 }

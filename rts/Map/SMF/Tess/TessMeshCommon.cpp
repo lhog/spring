@@ -11,8 +11,8 @@
 #include "Map/HeightMapTexture.h"
 #include "System/Log/ILog.h"
 
-CTessMeshCacheTF::CTessMeshCacheTF(const int numPatchesX, const int numPatchesZ):
-	CTessMeshCache(numPatchesX, numPatchesZ, GL_TRANSFORM_FEEDBACK_BUFFER)
+CTessMeshCacheTF::CTessMeshCacheTF(const int hmX, const int hmZ):
+	CTessMeshCache(hmX, hmZ, GL_TRANSFORM_FEEDBACK_BUFFER)
 {
 	LOG("CTessMeshCacheTF");
 	meshTessTFOs.resize(numPatchesX * numPatchesZ);
@@ -39,7 +39,7 @@ CTessMeshCacheTF::~CTessMeshCacheTF() {
 }
 
 void CTessMeshCacheTF::Update(){
-	if (std::find(tessMeshDirty.begin(), tessMeshDirty.end(), true) == tessMeshDirty.end()) //nothing to do
+	if (!cameraMoved && std::find(hmChanged.begin(), hmChanged.end(), true) == hmChanged.end()) //nothing to do
 		return;
 
 	GLuint tfQuery;
@@ -55,10 +55,10 @@ void CTessMeshCacheTF::Update(){
 	glPatchParameteri(GL_PATCH_VERTICES, 4); //quads per patch
 
 	tessMeshShader->Activate();
-	tessMeshShader->SetScreenDims();
+	tessMeshShader->SetCommonUniforms();
 
 	for (int i = 0; i < numPatchesX * numPatchesZ; ++i) {
-		if (tessMeshDirty[0] || tessMeshDirty[i + 1]) {
+		if (hmChanged[0] || hmChanged[i + 1]) {
 			int x = i / numPatchesZ;
 			int z = i % numPatchesZ;
 
@@ -84,11 +84,11 @@ void CTessMeshCacheTF::Update(){
 			//glGetQueryObjectuiv(tfQuery, GL_QUERY_RESULT, &numPrimitivesWritten); //in triangles
 			//LOG("PatchID = %d numPrimitivesWritten = %d", i, numPrimitivesWritten);
 
-			tessMeshDirty[i + 1] = false;
+			hmChanged[i + 1] = false;
 		}
 	}
 
-	tessMeshDirty[0] = false;
+	hmChanged[0] = false;
 
 	//glDisable(GL_RASTERIZER_DISCARD);
 	glDisableClientState(GL_VERTEX_ARRAY);
@@ -118,8 +118,8 @@ void CTessMeshCacheTF::DrawMesh(const int px, const int pz){
 
 /////////////////////////////////////////////////////////////////////////////////
 
-CTessMeshCacheSSBO::CTessMeshCacheSSBO(const int numPatchesX, const int numPatchesZ) :
-	CTessMeshCache(numPatchesX, numPatchesZ, GL_SHADER_STORAGE_BUFFER)
+CTessMeshCacheSSBO::CTessMeshCacheSSBO(const int hmX, const int hmZ) :
+	CTessMeshCache(hmX, hmZ, GL_SHADER_STORAGE_BUFFER)
 {
 	drawIndirect = GLEW_ARB_draw_indirect;
 
@@ -135,45 +135,25 @@ CTessMeshCacheSSBO::CTessMeshCacheSSBO(const int numPatchesX, const int numPatch
 	memset(&daicZero, 0, sizeof(DrawArraysIndirectCommand));
 	daicZero.primCount = 1u;
 
-	/////////////
-	numMips = static_cast<int>(std::log2(TeshMessConsts::TESS_LEVEL));
-	glGenTextures(1, &logTex);
-
-	glActiveTexture(GL_TEXTURE0);
-	GLint prevTexID;
-	glGetIntegerv(GL_TEXTURE_BINDING_2D, &prevTexID);
-	glBindTexture(GL_TEXTURE_2D, logTex);
-
-	glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_BASE_LEVEL, 0);
-	glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_MAX_LEVEL, numMips - 1);
-
-	glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_WRAP_S, GL_CLAMP_TO_EDGE);
-	glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_WRAP_T, GL_CLAMP_TO_EDGE);
-
-	glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_MIN_FILTER, GL_NEAREST);
-	glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_MAG_FILTER, GL_NEAREST);
-
-	if (GLEW_ARB_texture_storage)
-		glTexStorage2D(GL_TEXTURE_2D, numMips, GL_R32F, mapDims.mapx, mapDims.mapy);
-	else {
-		for (int mipNum = 0; mipNum < numMips; ++mipNum)
-			glTexImage2D(GL_TEXTURE_2D, mipNum, GL_R32F, std::min(mapDims.mapx >> mipNum, 1), std::min(mapDims.mapy >> mipNum, 1), 0, GL_RED, GL_FLOAT, nullptr);
-	}
-	glBindTexture(GL_TEXTURE_2D, prevTexID);
-
-	/////////////
-
 	tessMeshShader = std::unique_ptr<CTessMeshShaderSSBO>(new CTessMeshShaderSSBO(SQUARE_SIZE * mapDims.mapx, SQUARE_SIZE * mapDims.mapy));
 	tessMeshShader->SetMaxTessValue(TeshMessConsts::TESS_LEVEL);
+
+	tessHMVarPass = std::unique_ptr<CTessHMVariancePass>(new CTessHMVariancePass(hmX, hmZ, TeshMessConsts::TESS_LEVEL));
 }
 
 CTessMeshCacheSSBO::~CTessMeshCacheSSBO(){
-	glDeleteTextures(1, &logTex);
+	for (auto i = 0; i < numPatchesX * numPatchesZ; ++i) {
+		glDeleteBuffers(1, &meshTessDAIBs[i]);
+	}
 }
 
 void CTessMeshCacheSSBO::Update(){
-	if (std::find(tessMeshDirty.begin(), tessMeshDirty.end(), true) == tessMeshDirty.end()) //nothing to do
+	if (!cameraMoved && std::find(hmChanged.begin(), hmChanged.end(), true) == hmChanged.end()) //nothing to do
 		return;
+
+	/////////////////////////////////////////
+	tessHMVarPass->Run(heightMapTexture->GetTextureID());
+	/////////////////////////////////////////
 
 	glEnableClientState(GL_VERTEX_ARRAY);
 	glEnable(GL_RASTERIZER_DISCARD);
@@ -186,14 +166,15 @@ void CTessMeshCacheSSBO::Update(){
 	glPatchParameteri(GL_PATCH_VERTICES, 4); //quads per patch
 
 	tessMeshShader->Activate();
-	tessMeshShader->SetScreenDims();
-	tessMeshShader->SetShadowMatrix();
+	tessMeshShader->BindTextures(tessHMVarPass->GetTextureID());
+	//tessMeshShader->BindTextures(heightMapTexture->GetTextureID());
+	tessMeshShader->SetCommonUniforms();
 
 	GLuint npwNow = 0u;
 	GLuint npwTotal = 0u;
 
 	for (int i = 0; i < numPatchesX * numPatchesZ; ++i) {
-		if (tessMeshDirty[0] || tessMeshDirty[i + 1]) {
+		if (hmChanged[0] || hmChanged[i + 1]) {
 			int x = i / numPatchesZ;
 			int z = i % numPatchesZ;
 
@@ -210,7 +191,7 @@ void CTessMeshCacheSSBO::Update(){
 				glBeginQuery(GL_PRIMITIVES_GENERATED, tessMeshQuery);
 
 			glDrawArrays(GL_PATCHES, 0, TeshMessConsts::PATCH_VERT_NUM);
-			//glMemoryBarrier(GL_SHADER_STORAGE_BARRIER_BIT);
+			glMemoryBarrier(GL_SHADER_STORAGE_BARRIER_BIT);
 
 			if (runQueries) {
 				glEndQuery(GL_PRIMITIVES_GENERATED);
@@ -229,19 +210,22 @@ void CTessMeshCacheSSBO::Update(){
 			glBindBufferBase(GL_SHADER_STORAGE_BUFFER, 0, 0);
 			glBindBufferBase(GL_SHADER_STORAGE_BUFFER, 1, 0);
 
-			tessMeshDirty[i + 1] = false;
+			hmChanged[i + 1] = false;
 		}
 	}
 
-	if (runQueries && tessMeshDirty[0])
+	if (runQueries && hmChanged[0])
 		LOG("[Tesselation Shader:SSBO-Backend] Total Number of primitives written: %d", npwTotal);
 
-	tessMeshDirty[0] = false;
+	hmChanged[0] = false;
 
 	glDisable(GL_RASTERIZER_DISCARD);
 	glEnable(GL_CULL_FACE);
 	glDisableClientState(GL_VERTEX_ARRAY);
+
 	tessMeshShader->Deactivate();
+	tessMeshShader->UnbindTextures();
+
 	glPatchParameteri(GL_PATCH_VERTICES, 3); // restore default
 }
 
@@ -276,12 +260,11 @@ void CTessMeshCacheSSBO::DrawMesh(const int px, const int pz){
 	glDisableClientState(GL_VERTEX_ARRAY);
 }
 
-void CTessMeshCache::RequestTesselation() {
-	tessMeshDirty[0] = true;
+void CTessMeshCache::CameraMoved() {
 }
 
-void CTessMeshCache::RequestTesselation(const int px, const int pz) {
-	tessMeshDirty[px * numPatchesZ + pz + 1] = true;
+void CTessMeshCache::TesselatePatch(const int px, const int pz) {
+	hmChanged[px * numPatchesZ + pz + 1] = true;
 }
 
 void CTessMeshCache::FillMeshTemplateBuffer() {
@@ -297,9 +280,11 @@ void CTessMeshCache::FillMeshTemplateBuffer() {
 	assert(patchVertIdx == TeshMessConsts::PATCH_VERT_NUM);
 }
 
-CTessMeshCache::CTessMeshCache(const int numPatchesX, const int numPatchesZ, const GLenum meshTessBufferType) :
-	numPatchesX(numPatchesX),
-	numPatchesZ(numPatchesZ),
+CTessMeshCache::CTessMeshCache(const int hmX, const int hmZ, const GLenum meshTessBufferType) :
+	hmX(hmX),
+	hmZ(hmZ),
+	numPatchesX(hmX / TeshMessConsts::PATCH_SIZE),
+	numPatchesZ(hmZ / TeshMessConsts::PATCH_SIZE),
 	runQueries(false)
 {
 	LOG("CTessMeshCache");
@@ -317,9 +302,7 @@ CTessMeshCache::CTessMeshCache(const int numPatchesX, const int numPatchesZ, con
 	glGenQueries(1, &tessMeshQuery);
 
 	meshTessVBOs.resize(numPatchesX * numPatchesZ);
-	tessMeshDirty.resize(numPatchesX * numPatchesZ + 1); //first one is a global retesselation bool
-
-	RequestTesselation();
+	hmChanged.resize(numPatchesX * numPatchesZ, true);
 
 	for (auto& meshTessVBO : meshTessVBOs) {
 		glGenBuffers(1, &meshTessVBO);

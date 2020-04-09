@@ -16,7 +16,7 @@
 
 struct TeshMessConsts {
 	static constexpr int32_t PATCH_SIZE = 128; // must match SMFReadMap::bigSquareSize
-	static constexpr int32_t TESS_LEVEL = 32; // should be a power of two, less or equal than GL_MAX_TESS_GEN_LEVEL (64)
+	static constexpr int32_t TESS_LEVEL = 16; // should be a power of two, less or equal than GL_MAX_TESS_GEN_LEVEL (64)
 	static constexpr int32_t PATCH_RC_QUAD_NUM = PATCH_SIZE / TESS_LEVEL; // number of quads in one row/column of the patch
 	static constexpr int32_t PATCH_VERT_NUM = 4 * PATCH_RC_QUAD_NUM * PATCH_RC_QUAD_NUM;  // number of vertices in whole patch
 	static constexpr int32_t TESS_TRIANGLE_NUM_MAX = (PATCH_RC_QUAD_NUM * PATCH_RC_QUAD_NUM) * (TESS_LEVEL * TESS_LEVEL) * 2;
@@ -42,7 +42,7 @@ struct MeshTessTriangle {
 class CTessMeshCache
 {
 public:
-	CTessMeshCache(const int numPatchesX, const int numPatchesZ, const GLenum meshTessBufferType);
+	CTessMeshCache(const int hmX, const int hmZ, const GLenum meshTessBufferType);
 	virtual ~CTessMeshCache();
 public:
 	static bool Supported() {
@@ -60,24 +60,29 @@ public:
 	};
 public:
 	virtual void Update() = 0;
-	virtual void RequestTesselation();
-	virtual void RequestTesselation(const int px, const int pz);
+	virtual void CameraMoved();
+	virtual void TesselatePatch(const int px, const int pz);
 	virtual void SetRunQueries(bool b) { runQueries = b; }
 	virtual void Reset() = 0;
 	virtual void DrawMesh(const int px, const int pz) = 0;
 private:
 	void FillMeshTemplateBuffer();
 protected:
-	int numPatchesX;
-	int numPatchesZ;
+	const int hmX;
+	const int hmZ;
+
+	const int numPatchesX;
+	const int numPatchesZ;
 
 	bool runQueries;
 
 	GLuint tessMeshQuery;
 
-	std::vector<bool> tessMeshDirty;
+	bool cameraMoved;
+	std::vector<bool> hmChanged;
 
 	std::unique_ptr<CTessMeshShader> tessMeshShader;
+	std::unique_ptr<CTessHMVariancePass> tessHMVarPass;
 
 	std::unique_ptr<MeshPatches> meshTemplate;
 
@@ -130,11 +135,6 @@ public:
 private:
 	DrawArraysIndirectCommand daicZero;
 	std::vector<GLuint> meshTessDAIBs;
-
-	int numMips;
-
-	GLuint logTex; //Laplacian of Gaussian, high-Z texture
-	std::vector<GLuint> logImages; //Laplacian of Gaussian Images;
 
 	bool drawIndirect;
 };

@@ -124,7 +124,7 @@ static void CreateBindingTypeMap()
 	bindingType[GL_UNSIGNED_INT_SAMPLER_2D_MULTISAMPLE_ARRAY] = INT1;
 	bindingType[GL_UNSIGNED_INT_SAMPLER_BUFFER]               = INT1;
 	bindingType[GL_UNSIGNED_INT_SAMPLER_2D_RECT]              = INT1;
-/*
+
 	bindingType[GL_IMAGE_1D]                   = INT1;
 	bindingType[GL_IMAGE_2D]                   = INT1;
 	bindingType[GL_IMAGE_3D]                   = INT1;
@@ -135,7 +135,7 @@ static void CreateBindingTypeMap()
 	bindingType[GL_IMAGE_2D_ARRAY]             = INT1;
 	bindingType[GL_IMAGE_2D_MULTISAMPLE]       = INT1;
 	bindingType[GL_IMAGE_2D_MULTISAMPLE_ARRAY] = INT1;
-
+/*
 	bindingType[GL_INT_IMAGE_1D]                            = INT1;
 	bindingType[GL_INT_IMAGE_2D]                            = INT1;
 	bindingType[GL_INT_IMAGE_3D]                            = INT1;
