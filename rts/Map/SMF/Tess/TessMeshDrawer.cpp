@@ -41,20 +41,10 @@ CTessMeshDrawer::CTessMeshDrawer(CSMFGroundDrawer* gd)
 	assert(numPatchesX >= 1);
 	assert(numPatchesZ >= 1);
 
-/*
-	if (CTessMeshCacheSSBO::Supported())
-		tessMeshCache = std::unique_ptr<CTessMeshCacheSSBO>(new CTessMeshCacheSSBO(numPatchesX, numPatchesZ));
-	else if ((CTessMeshCacheTF::Supported()))
-		tessMeshCache = std::unique_ptr<CTessMeshCacheTF>(new CTessMeshCacheTF(numPatchesX, numPatchesZ));
-*/
-/*
-	if ((CTessMeshCacheTF::Supported()))
-		tessMeshCache = std::unique_ptr<CTessMeshCacheTF>(new CTessMeshCacheTF(numPatchesX, numPatchesZ));
-*/
 	if ((CTessMeshCacheSSBO::Supported()))
 		tessMeshCache = std::unique_ptr<CTessMeshCacheSSBO>(new CTessMeshCacheSSBO(mapDims.mapx, mapDims.mapy));
 
-	//tessMeshCache->SetRunQueries(true);
+	tessMeshCache->SetRunQueries(true);
 }
 
 CTessMeshDrawer::~CTessMeshDrawer()
@@ -83,7 +73,6 @@ void CTessMeshDrawer::DrawBorderMesh(const DrawPass::e& drawPass)
 
 bool CTessMeshDrawer::Supported() {
 	return
-		CTessMeshCacheTF::Supported() ||
 		CTessMeshCacheSSBO::Supported();
 }
 
@@ -101,10 +90,12 @@ void CTessMeshDrawer::UnsyncedHeightMapUpdate(const SRectangle& rect)
 	for (int z = static_cast<int>(std::floor(rect.z1 / TeshMessConsts::UHM_TO_MESH)); z <= static_cast<int>(std::ceil(rect.z2 / TeshMessConsts::UHM_TO_MESH)); ++z) {
 		tessMeshCache->TesselatePatch(x, z);
 	}
+
+	tessMeshCache->Update();
 }
 
 void CTessMeshDrawer::SunChanged() {
-	tessMeshCache->TesselatePatch();
+	tessMeshCache->CameraMoved();
 }
 
 void CTessMeshDrawer::Update()
@@ -144,7 +135,7 @@ void CTessMeshDrawer::Update()
 */
 		lastCamPos = camPos;
 		lastCamDir = camDir;
-		tessMeshCache->TesselatePatch();
+		tessMeshCache->CameraMoved();;
 	}
 
 	tessMeshCache->Update();

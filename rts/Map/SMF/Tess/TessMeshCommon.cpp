@@ -11,111 +11,6 @@
 #include "Map/HeightMapTexture.h"
 #include "System/Log/ILog.h"
 
-CTessMeshCacheTF::CTessMeshCacheTF(const int hmX, const int hmZ):
-	CTessMeshCache(hmX, hmZ, GL_TRANSFORM_FEEDBACK_BUFFER)
-{
-	LOG("CTessMeshCacheTF");
-	meshTessTFOs.resize(numPatchesX * numPatchesZ);
-
-	for (auto i = 0; i < numPatchesX * numPatchesZ; ++i) {
-		glGenTransformFeedbacks(1, &meshTessTFOs[i]);
-
-		glBindTransformFeedback(GL_TRANSFORM_FEEDBACK, meshTessTFOs[i]);
-
-		glBindBufferBase(GL_TRANSFORM_FEEDBACK_BUFFER, 0, meshTessVBOs[i]);
-
-		glBindTransformFeedback(GL_TRANSFORM_FEEDBACK, 0);
-	}
-	tessMeshShader = std::unique_ptr<CTessMeshShaderTF>(new CTessMeshShaderTF(SQUARE_SIZE * mapDims.mapx, SQUARE_SIZE * mapDims.mapy));
-	tessMeshShader->SetMaxTessValue(TeshMessConsts::TESS_LEVEL);
-
-	LOG("CTessMeshCacheTF 2");
-}
-
-CTessMeshCacheTF::~CTessMeshCacheTF() {
-	for (const auto meshTessTFO : meshTessTFOs) {
-		glDeleteTransformFeedbacks(1, &meshTessTFO);
-	}
-}
-
-void CTessMeshCacheTF::Update(){
-	if (!cameraMoved && std::find(hmChanged.begin(), hmChanged.end(), true) == hmChanged.end()) //nothing to do
-		return;
-
-	GLuint tfQuery;
-	glGenQueries(1, &tfQuery);
-
-	glEnableClientState(GL_VERTEX_ARRAY);
-	//glEnable(GL_RASTERIZER_DISCARD);
-
-	glBindBuffer(GL_ARRAY_BUFFER, meshTemplateVBO);
-	glVertexPointer(3, GL_FLOAT, 0, 0);
-	glBindBuffer(GL_ARRAY_BUFFER, 0);
-
-	glPatchParameteri(GL_PATCH_VERTICES, 4); //quads per patch
-
-	tessMeshShader->Activate();
-	tessMeshShader->SetCommonUniforms();
-
-	for (int i = 0; i < numPatchesX * numPatchesZ; ++i) {
-		if (hmChanged[0] || hmChanged[i + 1]) {
-			int x = i / numPatchesZ;
-			int z = i % numPatchesZ;
-
-			//LOG("SetSquareCoord(%d, %d)", x, z);
-			tessMeshShader->SetSquareCoord(x, z);
-
-			//GL_TRANSFORM_FEEDBACK_PRIMITIVES_WRITTEN
-			//glBeginQuery(GL_PRIMITIVES_GENERATED, tfQuery);
-
-			//glBindBufferBase(GL_TRANSFORM_FEEDBACK_BUFFER, 0, meshTessVBOs[i]);
-			//glBindTransformFeedback(GL_TRANSFORM_FEEDBACK, meshTessTFOs[i]);
-			//glBeginTransformFeedback(GL_TRIANGLES);
-
-			glDrawArrays(GL_PATCHES, 0, TeshMessConsts::PATCH_VERT_NUM);
-
-			//glEndTransformFeedback();
-			//glBindTransformFeedback(GL_TRANSFORM_FEEDBACK, 0);
-			//glBindBufferBase(GL_TRANSFORM_FEEDBACK_BUFFER, 0, 0);
-
-			//glEndQuery(GL_PRIMITIVES_GENERATED);
-
-			//GLuint numPrimitivesWritten = 0u;
-			//glGetQueryObjectuiv(tfQuery, GL_QUERY_RESULT, &numPrimitivesWritten); //in triangles
-			//LOG("PatchID = %d numPrimitivesWritten = %d", i, numPrimitivesWritten);
-
-			hmChanged[i + 1] = false;
-		}
-	}
-
-	hmChanged[0] = false;
-
-	//glDisable(GL_RASTERIZER_DISCARD);
-	glDisableClientState(GL_VERTEX_ARRAY);
-
-	tessMeshShader->Deactivate();
-
-	glDeleteQueries(1, &tfQuery);
-
-	glPatchParameteri(GL_PATCH_VERTICES, 3); // restore default
-}
-
-void CTessMeshCacheTF::Reset(){
-}
-
-void CTessMeshCacheTF::DrawMesh(const int px, const int pz){
-	const int idx = px * numPatchesZ + pz;
-	glEnableClientState(GL_VERTEX_ARRAY);
-
-	glBindBuffer(GL_ARRAY_BUFFER, meshTessVBOs[idx]);
-		glVertexPointer(3, GL_FLOAT, 0, (void*)0);
-	glBindBuffer(GL_ARRAY_BUFFER, 0);
-
-	glDrawTransformFeedback(GL_TRIANGLES, meshTessTFOs[idx]);
-
-	glDisableClientState(GL_VERTEX_ARRAY);
-}
-
 /////////////////////////////////////////////////////////////////////////////////
 
 CTessMeshCacheSSBO::CTessMeshCacheSSBO(const int hmX, const int hmZ) :
@@ -264,7 +159,7 @@ void CTessMeshCache::CameraMoved() {
 }
 
 void CTessMeshCache::TesselatePatch(const int px, const int pz) {
-	hmChanged[px * numPatchesZ + pz + 1] = true;
+	hmChanged[px * numPatchesZ + pz] = true;
 }
 
 void CTessMeshCache::FillMeshTemplateBuffer() {

@@ -8,25 +8,22 @@ layout ( triangle_strip, max_vertices = 3 ) out;
 
 uniform mat4 shadowMat;
 
-#ifdef SSBO
-	layout(std140, binding = 0) buffer DrawArraysIndirectCommand {
-		int count;
-		int primCount;
-		int first;
-		int baseInstance;
-	};
+layout(std140, binding = 0) buffer DrawArraysIndirectCommand {
+	int count;
+	int primCount;
+	int first;
+	int baseInstance;
+};
 
-	// https://community.khronos.org/t/size-of-elements-of-arrays-in-shader-storage-buffer-objects/69803/6
-	struct Pos {
-		float x, y, z;
-	};
+// https://community.khronos.org/t/size-of-elements-of-arrays-in-shader-storage-buffer-objects/69803/6
+struct Pos {
+	float x, y, z;
+};
 
-	layout(std430, binding = 1) writeonly restrict buffer MeshTessTriangle {
-		Pos pos[];
-	};
-#else
-	out vec3 vPosTF;
-#endif
+layout(std430, binding = 1) writeonly restrict buffer MeshTessTriangle {
+	Pos pos[];
+};
+
 
 struct Data {
 	vec2 mapUV;
@@ -55,22 +52,17 @@ void main() {
 		return;
 #endif
 
-#ifdef SSBO
+
 	int idx = atomicAdd(count, 3);
-#endif
 
 	for (int i = 0; i < 3; ++i) {
 
 		gl_Position = gl_in[i].gl_Position;
-	#ifdef SSBO
 		gl_PrimitiveID = idx / 3;
 		pos[idx + i].x = gl_Position.x;
 		pos[idx + i].y = gl_Position.y;
 		pos[idx + i].z = gl_Position.z;
-	#else
-		vPosTF = gl_Position.xyz;
-		gl_PrimitiveID = gl_PrimitiveIDIn;
-	#endif
+
 
 		dataGS.mapUV = dataTES[i].mapUV;
 

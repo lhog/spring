@@ -91,25 +91,9 @@ protected:
 	GLuint meshTemplateVBO;
 };
 
-class CTessMeshCacheTF : public CTessMeshCache
-{
-public:
-	//, const GLenum meshTessBufferType = GL_TRANSFORM_FEEDBACK_BUFFER
-	CTessMeshCacheTF(const int numPatchesX, const int numPatchesZ);
-	virtual ~CTessMeshCacheTF();
-public:
-	static bool Supported() {
-		return CTessMeshCache::Supported() &&
-			GLEW_ARB_transform_feedback2;
-	};
-public:
-	// Inherited via CTessMeshCache
-	virtual void Update() override;
-	virtual void Reset() override;
-	virtual void DrawMesh(const int px, const int pz) override;
-private:
-	std::vector<GLuint> meshTessTFOs;
-};
+// Once upon the time there was CTessMeshCacheTF (Transform Feedback) implementation here.
+// Surprisingly enough it never worked, despite succesfull non-Spring prototype and all my efforts.
+// Therefore one might witness split between CTessMeshCache & CTessMeshCacheSSBO, which might look unneeded.
 
 class CTessMeshCacheSSBO : public CTessMeshCache
 {

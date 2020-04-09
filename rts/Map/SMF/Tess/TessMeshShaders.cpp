@@ -67,46 +67,15 @@ void CTessMeshShader::SetCommonUniforms() {
 }
 
 
-
-/////////////////////////////////////////////////////////////////////////////////
-
-CTessMeshShaderTF::CTessMeshShaderTF(const int mapX, const int mapZ):
-	CTessMeshShader(mapX, mapZ)
-{
-	gsSO = shaderHandler->CreateShaderObject("GLSL/TerrainMeshGeomProg.glsl", "", GL_GEOMETRY_SHADER);
-
-	shaderPO = shaderHandler->CreateProgramObject(poClass, "TF-GLSL", false);
-
-	shaderPO->AttachShaderObject(vsSO);
-	shaderPO->AttachShaderObject(tcsSO);
-	shaderPO->AttachShaderObject(tesSO);
-	shaderPO->AttachShaderObject(gsSO);
-	//shaderPO->AttachShaderObject(fsSO);
-
-	const char* tfVarying = "vPosTF";
-	glTransformFeedbackVaryings(shaderPO->GetObjID(), 1, &tfVarying, GL_INTERLEAVED_ATTRIBS);
-
-	//shaderPO->SetFlag("SSBO", 0);
-
-	shaderPO->Link();
-
-	shaderPO->Enable();
-		shaderPO->SetUniform("mapDims", mapX, mapZ);
-		shaderPO->SetUniform("hmVarTex", 0);
-	shaderPO->Disable();
-}
-
-CTessMeshShaderTF::~CTessMeshShaderTF() {
-	shaderHandler->ReleaseProgramObjects(poClass);
-	glDeleteShader(gsSO->GetObjID());
-}
-
+// Once upon the time there was CTessMeshShaderTF (Transform Feedback) implementation here.
+// Surprisingly enough it never worked, despite succesfull non-Spring prototype and all my efforts.
+// Therefore one might witness split between CTessMeshShader & CTessMeshShaderSSBO, which might look unneeded.
 /////////////////////////////////////////////////////////////////////////////////
 
 CTessMeshShaderSSBO::CTessMeshShaderSSBO(const int mapX, const int mapZ) :
 	CTessMeshShader(mapX, mapZ)
 {
-	gsSO = shaderHandler->CreateShaderObject("GLSL/TerrainMeshGeomProg.glsl", gsDef, GL_GEOMETRY_SHADER);
+	gsSO = shaderHandler->CreateShaderObject("GLSL/TerrainMeshGeomProg.glsl", "", GL_GEOMETRY_SHADER);
 
 	shaderPO = shaderHandler->CreateProgramObject(poClass, "SSBO-GLSL", false);
 

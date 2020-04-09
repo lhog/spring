@@ -38,20 +38,11 @@ protected:
 	GLint prevTexID;
 };
 
-class CTessMeshShaderTF : public CTessMeshShader {
-public:
-	CTessMeshShaderTF(const int mapX, const int mapZ);
-	virtual ~CTessMeshShaderTF();
-private:
-	const std::string poClass = "[TessMeshDrawer-TF]";
-};
-
 class CTessMeshShaderSSBO : public CTessMeshShader {
 public:
 	CTessMeshShaderSSBO(const int mapX, const int mapZ);
 	virtual ~CTessMeshShaderSSBO();
 private:
-	const std::string gsDef = "#define SSBO\n";
 	const std::string poClass = "[TessMeshDrawer-SSBO]";
 };
 
