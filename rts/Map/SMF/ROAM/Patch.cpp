@@ -28,8 +28,8 @@ TriTreeNode TriTreeNode::dummyNode;
 Patch::RenderMode Patch::renderMode = Patch::VBO;
 
 
-static size_t CUR_POOL_SIZE =                            0; // split over all threads
-static size_t MAX_POOL_SIZE = RoamConst::NEW_POOL_SIZE * 8; // upper limit for ResetAll
+static size_t CUR_POOL_SIZE =                 0; // split over all threads
+static size_t MAX_POOL_SIZE = NEW_POOL_SIZE * 8; // upper limit for ResetAll
 
 
 static CTriNodePool pools[CRoamMeshDrawer::MESH_COUNT][ThreadPool::MAX_THREADS];
@@ -39,9 +39,10 @@ void CTriNodePool::InitPools(bool shadowPass, size_t newPoolSize)
 {
 	for (int j = 0, numThreads = ThreadPool::GetMaxThreads(); newPoolSize > 0; j++) {
 		try {
-			const size_t thrPoolSize = std::max((CUR_POOL_SIZE = newPoolSize) / numThreads, newPoolSize / 3);
-
+			size_t thrPoolSize =  std::max((CUR_POOL_SIZE = newPoolSize),newPoolSize); //the first pool should be larger, as only full retess uses threaded
 			for (int i = 0; i < numThreads; i++) {
+				if (i > 0) thrPoolSize = std::max((CUR_POOL_SIZE = newPoolSize) / numThreads, newPoolSize / 3);
+
 				pools[shadowPass][i].Reset();
 				pools[shadowPass][i].Resize(thrPoolSize + (thrPoolSize & 1));
 			}
@@ -88,6 +89,7 @@ void CTriNodePool::Resize(size_t poolSize)
 	// live outside the pool, but KISS)
 	assert((poolSize & 1) == 0);
 	assert(poolSize > 0);
+	LOG_L(L_INFO, "[TriNodePool::%s] to " _STPF_,__func__, poolSize);
 
 	tris.resize(poolSize);
 }
@@ -150,12 +152,12 @@ void Patch::Init(CSMFGroundDrawer* _drawer, int patchX, int patchZ)
 	}
 
 
-	vertices.resize(3 * (RoamConst::PATCH_SIZE + 1) * (RoamConst::PATCH_SIZE + 1));
+	vertices.resize(3 * (PATCH_SIZE + 1) * (PATCH_SIZE + 1));
 	unsigned int index = 0;
 
 	// initialize vertices
-	for (int z = coors.y; z <= (coors.y + RoamConst::PATCH_SIZE); z++) {
-		for (int x = coors.x; x <= (coors.x + RoamConst::PATCH_SIZE); x++) {
+	for (int z = coors.y; z <= (coors.y + PATCH_SIZE); z++) {
+		for (int x = coors.x; x <= (coors.x + PATCH_SIZE); x++) {
 			vertices[index++] = x * SQUARE_SIZE;
 			vertices[index++] = 0.0f;
 			vertices[index++] = z * SQUARE_SIZE;
@@ -175,6 +177,20 @@ void Patch::Reset()
 	// attach the two base-triangles together
 	baseLeft.BaseNeighbor  = &baseRight;
 	baseRight.BaseNeighbor = &baseLeft;
+
+	//Connect the base triangles to their parent
+	baseLeft.parentPatch = this;
+	baseRight.parentPatch = this;
+	midPos.x = (coors.x + PATCH_SIZE / 2) * SQUARE_SIZE;
+	midPos.z = (coors.y + PATCH_SIZE / 2) * SQUARE_SIZE;
+	midPos.y = readMap->GetCurrAvgHeight();
+
+
+	//Reset camera
+	lastCameraPosition.x = -10000000.0f;
+	lastCameraPosition.y = -10000000.0f;
+	lastCameraPosition.z = -10000000.0f;
+	camDistanceLastTesselation = 10000000.0f;
 }
 
 
@@ -182,18 +198,22 @@ void Patch::UpdateHeightMap(const SRectangle& rect)
 {
 	const float* hMap = readMap->GetCornerHeightMapUnsynced();
 
+	float averageHeight = 0;
+
 	for (int z = rect.z1; z <= rect.z2; z++) {
 		for (int x = rect.x1; x <= rect.x2; x++) {
-			const int vindex = (z * (RoamConst::PATCH_SIZE + 1) + x) * 3;
+			const int vindex = (z * (PATCH_SIZE + 1) + x) * 3;
 
 			const int xw = x + coors.x;
 			const int zw = z + coors.y;
 
-			// only update y-coord
-			vertices[vindex + 1] = hMap[zw * mapDims.mapxp1 + xw];
+			const float height = hMap[zw * mapDims.mapxp1 + xw];
+			vertices[vindex + 1] = height;
+			averageHeight += height;
 		}
 	}
 
+	midPos.y = averageHeight/((PATCH_SIZE+1)*(PATCH_SIZE+1));
 	VBOUploadVertices();
 	isDirty = true;
 }
@@ -228,9 +248,11 @@ bool Patch::Split(TriTreeNode* tri)
 		return true;
 
 	// if this triangle is not in a proper diamond, force split our base-neighbor
-	if (!tri->BaseNeighbor->IsDummy() && (tri->BaseNeighbor->BaseNeighbor != tri))
+	if (!tri->BaseNeighbor->IsDummy() && (tri->BaseNeighbor->BaseNeighbor != tri)) {
 		Split(tri->BaseNeighbor);
-
+		if (tri->BaseNeighbor->parentPatch != this)
+			tri->BaseNeighbor->parentPatch->isChanged = true;
+	}
 	// create children and link into mesh, or make this triangle a leaf
 	if (!curTriPool->Allocate(tri->LeftChild, tri->RightChild))
 		return false;
@@ -242,6 +264,11 @@ bool Patch::Split(TriTreeNode* tri)
 	TriTreeNode* tln = tri->LeftNeighbor;
 	TriTreeNode* trn = tri->RightNeighbor;
 	TriTreeNode* tbn = tri->BaseNeighbor;
+
+	// Set up parent patches so they notify them of changes
+	tri->LeftChild->parentPatch = tri->parentPatch;
+	tri->RightChild->parentPatch = tri->parentPatch;
+	tri->parentPatch->isChanged = true;
 
 	assert(!tlc->IsDummy());
 	assert(!trc->IsDummy());
@@ -295,6 +322,9 @@ bool Patch::Split(TriTreeNode* tri)
 			// base Neighbor (in a diamond with us) was not split yet, do so now
 			// FIXME: if pool ran out above, this will fail and leave a LOD-crack
 			Split(tbn);
+			if (tbn->parentPatch != this)
+				tbn->parentPatch->isChanged = true;
+
 		}
 	} else {
 		// edge triangle, trivial case
@@ -321,7 +351,7 @@ void Patch::RecursTessellate(TriTreeNode* tri, const int2 left, const int2 right
 	// default > 1; when variance isn't saved this issues further tessellation
 	float triVariance = 10.0f;
 
-	if (curNodeIdx < (1 << RoamConst::VARIANCE_DEPTH)) {
+	if (curNodeIdx < (1 << VARIANCE_DEPTH)) {
 		// make maximum tessellation-level dependent on camDistLODFactor
 		// huge cliffs cause huge variances and would otherwise always tessellate
 		// regardless of the actual camera distance (-> huge/distfromcam ~= huge)
@@ -330,16 +360,20 @@ void Patch::RecursTessellate(TriTreeNode* tri, const int2 left, const int2 right
 		const int size  = std::max(sizeX, sizeY);
 
 		// take distance, variance and patch size into consideration
-		triVariance = (std::min(varianceTrees[varTreeIdx][curNodeIdx], varianceMaxLimit) * RoamConst::PATCH_SIZE * size) * camDistLODFactor;
+		triVariance = (std::min(varianceTrees[varTreeIdx][curNodeIdx], varianceMaxLimit) * PATCH_SIZE * size) * camDistLODFactor;
 	}
 
 	// stop tesselation
 	if (triVariance <= 1.0f)
 		return;
 
-	if ((Split(tri), !tri->IsBranch()))
-		return;
-
+	// since we can 'retesselate' to a deeper depth, to preserve the trinodepool we will only split if its unsplit
+	if (!tri->IsBranch()) {
+		Split(tri);
+		// we perform the split, and if the result is not a branch (e.g. couldnt split) we bail
+		if(!tri->IsBranch())
+			return;
+	}
 	// triangle was split, also try to split its children
 	const int2 center = {(left.x + right.x) >> 1, (left.y + right.y) >> 1};
 
@@ -357,9 +391,9 @@ void Patch::RecursRender(const TriTreeNode* tri, const int2 left, const int2 rig
 	if (tri->IsDummy())
 		return;
 	if (tri->IsLeaf()) {
-		indices.push_back(apex.x  + apex.y  * (RoamConst::PATCH_SIZE + 1));
-		indices.push_back(left.x  + left.y  * (RoamConst::PATCH_SIZE + 1));
-		indices.push_back(right.x + right.y * (RoamConst::PATCH_SIZE + 1));
+		indices.push_back(apex.x  + apex.y  * (PATCH_SIZE + 1));
+		indices.push_back(left.x  + left.y  * (PATCH_SIZE + 1));
+		indices.push_back(right.x + right.y * (PATCH_SIZE + 1));
 		return;
 	}
 
@@ -373,13 +407,13 @@ void Patch::RecursRender(const TriTreeNode* tri, const int2 left, const int2 rig
 void Patch::GenerateIndices()
 {
 	indices.clear();
-	RecursRender(&baseLeft,  int2(         0, RoamConst::PATCH_SIZE), int2(RoamConst::PATCH_SIZE,          0), int2(                    0,                     0));
-	RecursRender(&baseRight, int2(RoamConst::PATCH_SIZE,          0), int2(         0, RoamConst::PATCH_SIZE), int2(RoamConst::PATCH_SIZE, RoamConst::PATCH_SIZE));
+	RecursRender(&baseLeft,  int2(         0, PATCH_SIZE), int2(PATCH_SIZE,          0), int2(         0,          0));
+	RecursRender(&baseRight, int2(PATCH_SIZE,          0), int2(         0, PATCH_SIZE), int2(PATCH_SIZE, PATCH_SIZE));
 }
 
 float Patch::GetHeight(int2 pos)
 {
-	const int vindex = (pos.y * (RoamConst::PATCH_SIZE + 1) + pos.x) * 3 + 1;
+	const int vindex = (pos.y * (PATCH_SIZE + 1) + pos.x) * 3 + 1;
 	assert(readMap->GetCornerHeightMapUnsynced()[(coors.y + pos.y) * mapDims.mapxp1 + (coors.x + pos.x)] == vertices[vindex]);
 	return vertices[vindex];
 }
@@ -437,7 +471,7 @@ float Patch::RecursComputeVariance(
 	mvar = std::max(0.001f, mvar);
 
 	// store the final variance for this node
-	if (curNodeIdx < (1 << RoamConst::VARIANCE_DEPTH))
+	if (curNodeIdx < (1 << VARIANCE_DEPTH))
 		varianceTrees[varTreeIdx][curNodeIdx] = mvar;
 
 	return mvar;
@@ -450,9 +484,9 @@ float Patch::RecursComputeVariance(
 void Patch::ComputeVariance()
 {
 	{
-		const   int2 left = {                     0, RoamConst::PATCH_SIZE};
-		const   int2 rght = { RoamConst::PATCH_SIZE,                     0};
-		const   int2 apex = {                     0,                     0};
+		const   int2 left = {         0, PATCH_SIZE};
+		const   int2 rght = {PATCH_SIZE,          0};
+		const   int2 apex = {         0,          0};
 		const float3 hgts = {
 			GetHeight(left),
 			GetHeight(rght),
@@ -463,9 +497,9 @@ void Patch::ComputeVariance()
 	}
 
 	{
-		const   int2 left = { RoamConst::PATCH_SIZE,                     0};
-		const   int2 rght = {                     0, RoamConst::PATCH_SIZE};
-		const   int2 apex = { RoamConst::PATCH_SIZE, RoamConst::PATCH_SIZE};
+		const   int2 left = {PATCH_SIZE,          0};
+		const   int2 rght = {         0, PATCH_SIZE};
+		const   int2 apex = {PATCH_SIZE, PATCH_SIZE};
 		const float3 hgts = {
 			GetHeight(left),
 			GetHeight(rght),
@@ -486,10 +520,6 @@ void Patch::ComputeVariance()
 bool Patch::Tessellate(const float3& camPos, int viewRadius, bool shadowPass)
 {
 	// Set/Update LOD params (FIXME: wrong height?)
-	float3 midPos;
-	midPos.x = (coors.x + RoamConst::PATCH_SIZE / 2) * SQUARE_SIZE;
-	midPos.z = (coors.y + RoamConst::PATCH_SIZE / 2) * SQUARE_SIZE;
-	midPos.y = readMap->GetCurrAvgHeight();
 
 	// Tessellate is called from multiple threads during both passes
 	// caller ensures that two patches that are neighbors or share a
@@ -498,6 +528,7 @@ bool Patch::Tessellate(const float3& camPos, int viewRadius, bool shadowPass)
 
 	// MAGIC NUMBER 1: scale factor to reduce LOD with camera distance
 	camDistLODFactor  = midPos.distance(camPos);
+	camDistanceLastTesselation = camDistLODFactor; //store distance from camera
 	camDistLODFactor *= (300.0f / viewRadius);
 	camDistLODFactor  = std::max(1.0f, camDistLODFactor);
 	camDistLODFactor  = 1.0f / camDistLODFactor;
@@ -510,20 +541,25 @@ bool Patch::Tessellate(const float3& camPos, int viewRadius, bool shadowPass)
 
 	{
 		// split each of the base triangles
-		const int2 left = {coors.x                        , coors.y + RoamConst::PATCH_SIZE};
-		const int2 rght = {coors.x + RoamConst::PATCH_SIZE, coors.y             };
-		const int2 apex = {coors.x                        , coors.y             };
+		const int2 left = {coors.x,              coors.y + PATCH_SIZE};
+		const int2 rght = {coors.x + PATCH_SIZE, coors.y             };
+		const int2 apex = {coors.x,              coors.y             };
 
 		RecursTessellate(&baseLeft, left, rght, apex, 0, 1);
 	}
 	{
-		const int2 left = {coors.x + RoamConst::PATCH_SIZE, coors.y                        };
-		const int2 rght = {coors.x                        , coors.y + RoamConst::PATCH_SIZE};
-		const int2 apex = {coors.x + RoamConst::PATCH_SIZE, coors.y + RoamConst::PATCH_SIZE};
+		const int2 left = {coors.x + PATCH_SIZE, coors.y             };
+		const int2 rght = {coors.x,              coors.y + PATCH_SIZE};
+		const int2 apex = {coors.x + PATCH_SIZE, coors.y + PATCH_SIZE};
 
 		RecursTessellate(&baseRight, left, rght, apex, 1, 1);
 	}
 
+	// mark patches that are totally flat and did not get split in RecursTessellate
+	// as 'changed', so their vertices can be updated
+	if (baseLeft.IsLeaf() && baseRight.IsLeaf()) isChanged = true;
+
+    lastCameraPosition = camPos;
 	return (!curTriPool->OutOfNodes());
 }
 
@@ -585,9 +621,9 @@ void Patch::RecursBorderRender(
 	const int2 depth
 ) {
 	if (tri->IsLeaf()) {
-		const float3& v1 = *(float3*)&vertices[(apex.x + apex.y * (RoamConst::PATCH_SIZE + 1))*3];
-		const float3& v2 = *(float3*)&vertices[(left.x + left.y * (RoamConst::PATCH_SIZE + 1))*3];
-		const float3& v3 = *(float3*)&vertices[(rght.x + rght.y * (RoamConst::PATCH_SIZE + 1))*3];
+		const float3& v1 = *(float3*)&vertices[(apex.x + apex.y * (PATCH_SIZE + 1))*3];
+		const float3& v2 = *(float3*)&vertices[(left.x + left.y * (PATCH_SIZE + 1))*3];
+		const float3& v3 = *(float3*)&vertices[(rght.x + rght.y * (PATCH_SIZE + 1))*3];
 
 		static constexpr unsigned char white[] = {255, 255, 255, 255};
 		static constexpr unsigned char trans[] = {255, 255, 255,   0};
@@ -651,7 +687,7 @@ void Patch::GenerateBorderIndices(CVertexArray* va)
 {
 	va->Initialize();
 
-	#define PS RoamConst::PATCH_SIZE
+	#define PS PATCH_SIZE
 	// border vertices are always part of base-level triangles
 	// that have either no left or no right neighbor, i.e. are
 	// on the map edge
@@ -687,11 +723,12 @@ void Patch::Upload()
 		default: {
 		} break;
 	}
+	isChanged = false;
 }
 
 void Patch::SetSquareTexture() const
 {
-	smfGroundDrawer->SetupBigSquare(coors.x / RoamConst::PATCH_SIZE, coors.y / RoamConst::PATCH_SIZE);
+	smfGroundDrawer->SetupBigSquare(coors.x / PATCH_SIZE, coors.y / PATCH_SIZE);
 }
 
 
@@ -729,21 +766,6 @@ void Patch::SwitchRenderMode(int mode)
 // ---------------------------------------------------------------------
 // Visibility Update Functions
 //
-
-#if 0
-void Patch::UpdateVisibility(CCamera* cam)
-{
-	const float3 mins( coors.x               * SQUARE_SIZE, readMap->GetCurrMinHeight(),  coors.y               * SQUARE_SIZE);
-	const float3 maxs((coors.x + PATCH_SIZE) * SQUARE_SIZE, readMap->GetCurrMaxHeight(), (coors.y + PATCH_SIZE) * SQUARE_SIZE);
-
-	if (!cam->InView(mins, maxs))
-		return;
-
-	lastDrawFrames[cam->GetCamType()] = globalRendering->drawFrame;
-}
-#endif
-
-
 class CPatchInViewChecker : public CReadMap::IQuadDrawer
 {
 public:
@@ -768,21 +790,13 @@ private:
 
 void Patch::UpdateVisibility(CCamera* cam, std::vector<Patch>& patches, const int numPatchesX)
 {
-	#if 0
-	// very slow
-	for (Patch& p: patches) {
-		p.UpdateVisibility(cam);
-	}
-	#else
-	// very fast
 	static CPatchInViewChecker checker;
 
 	assert(cam->GetCamType() < CCamera::CAMTYPE_VISCUL);
 	checker.ResetState(cam, &patches[0], numPatchesX);
 
 	cam->CalcFrustumLines(readMap->GetCurrMinHeight() - 100.0f, readMap->GetCurrMaxHeight() + 100.0f, SQUARE_SIZE);
-	readMap->GridVisibility(cam, &checker, 1e9, RoamConst::PATCH_SIZE);
-	#endif
+	readMap->GridVisibility(cam, &checker, 1e9, PATCH_SIZE);
 }
 
 bool Patch::IsVisible(const CCamera* cam) const {

@@ -16,22 +16,20 @@ class CSMFGroundDrawer;
 class CCamera;
 
 
-struct RoamConst
-{
-	// how many heightmap pixels a patch consists of
-	static constexpr int32_t PATCH_SIZE = 128;
+// how many heightmap pixels a patch consists of
+#define PATCH_SIZE 128
 
-	// depth of variance tree; should be near SQRT(PATCH_SIZE) + 1
-	static constexpr int32_t VARIANCE_DEPTH = 12;
+// depth of variance tree; should be near SQRT(PATCH_SIZE) + 1
+#define VARIANCE_DEPTH (12)
 
-	// how many TriTreeNodes should be reserved per pool
-	// (1M is a reasonable baseline for most large maps)
-	static constexpr int32_t NEW_POOL_SIZE = (1 << 20);
-	// debug (simulates fast pool exhaustion)
-	// static constexpr int32_t NEW_POOL_SIZE = (1 << 2);
-};
+// how many TriTreeNodes should be reserved per pool
+// (2M is a reasonable baseline for most large maps)
+// if a 32bit TriTreeNode struct is 28 bytes, the total ram usage of LOAM is 2M*28*2 = 104 MB
+#define NEW_POOL_SIZE (1 << 21)
+// debug (simulates fast pool exhaustion)
+// #define NEW_POOL_SIZE (1 << 2)
 
-
+class Patch; //declare it so that tritreenode can store its parent
 // stores the triangle-tree structure, but no coordinates
 struct TriTreeNode
 {
@@ -57,6 +55,8 @@ struct TriTreeNode
 	TriTreeNode*  BaseNeighbor = &dummyNode;
 	TriTreeNode*  LeftNeighbor = &dummyNode;
 	TriTreeNode* RightNeighbor = &dummyNode;
+
+	Patch* parentPatch = NULL; //triangles know their parent patch so they know of a neighbour's Split() func caused changes to them
 };
 
 
@@ -66,7 +66,7 @@ struct TriTreeNode
 class CTriNodePool
 {
 public:
-	static void InitPools(bool shadowPass, size_t newPoolSize = RoamConst::NEW_POOL_SIZE);
+	static void InitPools(bool shadowPass, size_t newPoolSize = NEW_POOL_SIZE);
 	static void ResetAll(bool shadowPass);
 
 	inline static CTriNodePool* GetPoolForThread(bool shadowPass);
@@ -79,6 +79,8 @@ public:
 	bool ValidNode(const TriTreeNode* n) const { return (n >= &tris.front() && n <= &tris.back()); }
 	bool OutOfNodes() const { return (nextTriNodeIdx >= tris.size()); }
 
+	size_t getPoolSize() { return tris.size(); }
+	size_t getNextTriNodeIdx() { return nextTriNodeIdx; }
 private:
 	std::vector<TriTreeNode> tris;
 
@@ -115,7 +117,15 @@ public:
 	char IsDirty() const { return isDirty; }
 	int GetTriCount() const { return (indices.size() / 3); }
 
-	void UpdateHeightMap(const SRectangle& rect = SRectangle(0, 0, RoamConst::PATCH_SIZE, RoamConst::PATCH_SIZE));
+	void UpdateHeightMap(const SRectangle& rect = SRectangle(0, 0, PATCH_SIZE, PATCH_SIZE));
+
+	float3 lastCameraPosition ; //the last camera position this patch was tesselated from
+
+	//this specifies the manhattan distance from the camera during the last tesselation
+	//note that this can only become lower, as we can only increase tesselation levels while maintaining no cracks
+	float camDistanceLastTesselation;
+
+	// create an approximate mesh
 
 	bool Tessellate(const float3& camPos, int viewRadius, bool shadowPass);
 	void ComputeVariance();
@@ -173,10 +183,12 @@ private:
 
 	// pool used during Tessellate; each invoked Split allocates from this
 	CTriNodePool* curTriPool = nullptr;
-
+	float3 midPos;
 	// does the variance-tree need to be recalculated for this Patch?
 	bool isDirty = true;
 	bool vboVerticesUploaded = false;
+	// Did the tesselation tree change from what we have stored in the VBO?
+	bool isChanged = false;
 
 	float varianceMaxLimit = std::numeric_limits<float>::max();
 	float camDistLODFactor = 1.0f; // defines the LOD falloff in camera distance
@@ -188,7 +200,7 @@ private:
 	TriTreeNode baseLeft;  // left base-triangle tree node
 	TriTreeNode baseRight; // right base-triangle tree node
 
-	std::array<float, 1 << RoamConst::VARIANCE_DEPTH> varianceTrees[2];
+	std::array<float, 1 << VARIANCE_DEPTH> varianceTrees[2];
 
 	// TODO: remove for both the Displaylist and the VBO implementations (only really needed for VA's)
 	std::vector<float> vertices;
@@ -198,7 +210,7 @@ private:
 	// NOTE:
 	//   shadow-mesh patches are only ever viewed by one camera
 	//   normal-mesh patches can be viewed by *multiple* types!
-	std::array<unsigned int, CCamera::CAMTYPE_VISCUL> lastDrawFrames;
+	std::array<unsigned int, CCamera::CAMTYPE_VISCUL> lastDrawFrames = {};
 
 
 	GLuint triList = 0;
