@@ -47,10 +47,10 @@ uniform vec2 mapHeights; // min & max height on the map
 uniform vec4 lightDir;
 uniform vec3 cameraPos;
 
-in vec3 halfDir;
-in float fogFactor;
-in vec4 vertexWorldPos;
-in vec2 diffuseTexCoords;
+varying vec3 halfDir;
+varying float fogFactor;
+varying vec4 vertexWorldPos;
+varying vec2 diffuseTexCoords;
 
 #ifdef HAVE_INFOTEX
 	uniform sampler2D infoTex;
