@@ -327,6 +327,10 @@ void CWorldDrawer::DrawOpaqueObjects() const
 		DebugColVolDrawer::Draw();
 		pathDrawer->DrawAll();
 	}
+
+	LOG("eventHandler.DrawOpaqueObjectsPost()1");
+	eventHandler.DrawOpaqueObjectsPost();
+	LOG("eventHandler.DrawOpaqueObjectsPost()2");
 }
 
 void CWorldDrawer::DrawAlphaObjects() const

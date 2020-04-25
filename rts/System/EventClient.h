@@ -11,6 +11,8 @@
 #include "System/float3.h"
 #include "System/Misc/SpringTime.h"
 
+#include "System/Log/ILog.h"
+
 #ifdef __APPLE__
 // defined in X11/X.h
 #undef KeyPress
@@ -319,6 +321,7 @@ class CEventClient
 		virtual void DrawGenesis() {}
 		virtual void DrawWorld() {}
 		virtual void DrawWorldPreUnit() {}
+		virtual void DrawOpaqueObjectsPost() { LOG("DrawOpaqueObjectsPost__base"); }
 		virtual void DrawWorldPreParticles() {}
 		virtual void DrawWorldShadow() {}
 		virtual void DrawWorldReflection() {}

@@ -1789,6 +1789,7 @@ void CLuaHandle::RunDrawCallIn(const LuaHashString& hs)
 #define DRAW_CALLIN(name)                     \
 void CLuaHandle::name()                       \
 {                                             \
+	LOG("%s", #name);						  \
 	static const LuaHashString cmdStr(#name); \
 	RunDrawCallIn(cmdStr);                    \
 }
@@ -1797,6 +1798,7 @@ void CLuaHandle::name()                       \
 DRAW_CALLIN(DrawGenesis)
 DRAW_CALLIN(DrawWorld)
 DRAW_CALLIN(DrawWorldPreUnit)
+DRAW_CALLIN(DrawOpaqueObjectsPost)
 DRAW_CALLIN(DrawWorldPreParticles)
 DRAW_CALLIN(DrawWorldShadow)
 DRAW_CALLIN(DrawWorldReflection)

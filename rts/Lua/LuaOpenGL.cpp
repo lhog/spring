@@ -629,6 +629,33 @@ void LuaOpenGL::ResetDrawWorldPreUnit()
 }
 
 
+void LuaOpenGL::EnableDrawOpaqueObjectsPost()
+{
+	EnableCommon(DRAW_WORLD);
+	resetMatrixFunc = ResetWorldMatrices;
+	SetupWorldLighting();
+}
+
+void LuaOpenGL::DisableDrawOpaqueObjectsPost()
+{
+	if (safeMode) {
+		ResetWorldMatrices();
+	}
+	RevertWorldLighting();
+	DisableCommon(DRAW_WORLD);
+}
+
+void LuaOpenGL::ResetDrawOpaqueObjectsPost()
+{
+	if (safeMode) {
+		ResetWorldMatrices();
+		glCallList(resetStateList);
+	}
+}
+
+
+
+
 /******************************************************************************/
 //
 //  WorldShadow

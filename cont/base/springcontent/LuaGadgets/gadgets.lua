@@ -1833,6 +1833,13 @@ function gadgetHandler:DrawWorldPreUnit()
   end
 end
 
+function gadgetHandler:DrawOpaqueObjectsPost()
+Spring.Echo("DrawOpaqueObjectsPost")
+  for _,g in r_ipairs(self.DrawOpaqueObjectsPostList) do
+    g:DrawOpaqueObjectsPost()
+  end
+end
+
 function gadgetHandler:DrawWorldPreParticles()
   for _,g in r_ipairs(self.DrawWorldPreParticlesList) do
     g:DrawWorldPreParticles()
