@@ -33,7 +33,7 @@ CVertexArray::~CVertexArray()
 
 
 //////////////////////////////////////////////////////////////////////
-// 
+//
 //////////////////////////////////////////////////////////////////////
 
 void CVertexArray::Initialize()
@@ -58,7 +58,7 @@ void CVertexArray::EndStrip()
 
 
 //////////////////////////////////////////////////////////////////////
-// 
+//
 //////////////////////////////////////////////////////////////////////
 
 
@@ -195,7 +195,7 @@ void CVertexArray::DrawArraysCallback(const GLenum mode, const unsigned int stri
 
 
 //////////////////////////////////////////////////////////////////////
-// 
+//
 //////////////////////////////////////////////////////////////////////
 
 void CVertexArray::DrawArray0(const int drawType, unsigned int stride)
@@ -399,11 +399,29 @@ void CVertexArray::DrawArrayTC(const int drawType, unsigned int stride)
 	glDisableClientState(GL_COLOR_ARRAY);
 }
 
+void CVertexArray::DrawArrayL(const int drawType, unsigned int stride)
+{
+	if (drawIndex() == 0)
+		return;
+
+	CheckEndStrip();
+	glEnableClientState(GL_TEXTURE_COORD_ARRAY);
+	glEnableClientState(GL_VERTEX_ARRAY);
+	glEnableClientState(GL_COLOR_ARRAY);
+	glVertexPointer(3, GL_FLOAT, stride, drawArray);
+	glTexCoordPointer(2, GL_FLOAT, stride, drawArray + 3);
+	glColorPointer(4, GL_UNSIGNED_BYTE, stride, drawArray + 5);
+	DrawArrays(drawType, stride);
+	glDisableClientState(GL_TEXTURE_COORD_ARRAY);
+	glDisableClientState(GL_VERTEX_ARRAY);
+	glDisableClientState(GL_COLOR_ARRAY);
+}
+
 
 
 
 //////////////////////////////////////////////////////////////////////
-// 
+//
 //////////////////////////////////////////////////////////////////////
 
 void CVertexArray::EnlargeDrawArray()

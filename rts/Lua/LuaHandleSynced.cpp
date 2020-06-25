@@ -113,8 +113,8 @@ bool CUnsyncedLuaHandle::Init(const std::string& code, const std::string& file)
 	LuaPushNamedNumber(L, "COBSCALE",  COBSCALE);
 
 	// load our libraries
+	#define KILL { KillLua(); return false; }
 	{
-		#define KILL { KillLua(); return false; }
 		if (!LuaSyncedTable::PushEntries(L)) KILL
 
 		if (!AddEntriesToTable(L, "VFS",                   LuaVFS::PushUnsynced       )) KILL
@@ -138,10 +138,14 @@ bool CUnsyncedLuaHandle::Init(const std::string& code, const std::string& file)
 		if (!AddEntriesToTable(L, "CMD",              LuaConstCMD::PushEntries        )) KILL
 		if (!AddEntriesToTable(L, "CMDTYPE",      LuaConstCMDTYPE::PushEntries        )) KILL
 		if (!AddEntriesToTable(L, "LOG",                 LuaUtils::PushLogEntries     )) KILL
-		#undef KILL
 	}
 
 	lua_settop(L, 0);
+	{
+		//if (!LuaOpenGL::PostPushEntries(L)) KILL;
+	}
+
+	#undef KILL
 
 	// add code from the sub-class
 	if (!base.AddUnsyncedCode(L)) {

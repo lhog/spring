@@ -11,6 +11,12 @@ project(Spring)
 
 add_definitions(-DFMT_HEADER_ONLY) #for fmt lib
 
+# for sol2 lib
+add_definitions(-DLUA_VERSION_NUM=501)
+add_definitions(-DSOL_USING_CXX_LUA=1)
+add_definitions(-DSOL_ALL_SAFETIES_ON=1)
+add_definitions(-DSOL_NO_CHECK_NUMBER_PRECISION=1)
+
 # dummy so that qtcreator shows all files (even those of windows)
 if(CMAKE_VERSION VERSION_GREATER 3.1.2)
 	add_library(platform_sources EXCLUDE_FROM_ALL "")
@@ -331,13 +337,14 @@ else  (LDGOLD_FOUND)
 endif (LDGOLD_FOUND)
 
 
-### C++11/14
+## C++11/14
 if(${CMAKE_CXX_COMPILER_ID} STREQUAL "Clang")
 	message(STATUS "Compiling with C++14")
 	set(CMAKE_CXX_FLAGS "${CMAKE_CXX_FLAGS} -std=c++14")
 else()
-	message(STATUS "Compiling with C++11")
-	set(CMAKE_CXX_FLAGS "${CMAKE_CXX_FLAGS} ${CXX11_FLAGS}")
+	message(STATUS "Compiling with C++17")
+	#set(CMAKE_CXX_FLAGS "${CMAKE_CXX_FLAGS} ${CXX11_FLAGS}")
+	set(CMAKE_CXX_FLAGS "${CMAKE_CXX_FLAGS} -std=gnu++17")
 endif()
 
 

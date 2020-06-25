@@ -58,6 +58,14 @@ struct VA_TYPE_2dTC {
 	SColor c;
 };
 
+struct VA_TYPE_L {
+	float4 p; // Lua can freely set the w-component
+	float3 n;
+	float4 uv; // two channels for basic texturing
+	SColor c0; // primary
+	SColor c1; // secondary
+};
+
 
 // number of elements (bytes / sizeof(float)) per vertex
 #define VA_SIZE_0    (sizeof(VA_TYPE_0) / sizeof(float))
@@ -70,6 +78,7 @@ struct VA_TYPE_2dTC {
 #define VA_SIZE_2D0  (sizeof(VA_TYPE_2d0) / sizeof(float))
 #define VA_SIZE_2DT  (sizeof(VA_TYPE_2dT) / sizeof(float))
 #define VA_SIZE_2DTC (sizeof(VA_TYPE_2dTC) / sizeof(float))
+#define VA_SIZE_L    (sizeof(VA_TYPE_L) / sizeof(float))
 
 
 
@@ -115,11 +124,12 @@ public:
 	inline void AddVertexC(const float3& p, const unsigned char* c);
 	inline void AddVertexTC(const float3& p, float tx, float ty, const unsigned char* c);
 	inline void AddVertexTN(const float3& p, float tx, float ty, const float3& n);
-	inline void AddVertexTNT(const float3& p, float tx, float ty, const float3& n, const float3& st, const float3& tt); 
+	inline void AddVertexTNT(const float3& p, float tx, float ty, const float3& n, const float3& st, const float3& tt);
 	inline void AddVertex2d0(float x, float z);
 	inline void AddVertex2dT(float x, float y, float tx, float ty);
 	inline void AddVertex2dT(const float2 p, const float2 tc) { AddVertex2dT(p.x,p.y, tc.x,tc.y); }
 	inline void AddVertex2dTC(float x, float y, float tx, float ty, const unsigned char* c);
+	inline void AddVertex2L(const float4& p, const float3& n, const float4& uv, const unsigned char* c0, const unsigned char* c1);
 
 	// same as the AddVertex... functions just without automated CheckEnlargeDrawArray
 	inline void AddVertexQ0(float x, float y, float z);
@@ -134,6 +144,7 @@ public:
 	inline void AddVertexQ2dT(float x, float y, float tx, float ty);
 	inline void AddVertexQ2dT(const float2 p, const float2 tc) { AddVertexQ2dT(p.x,p.y, tc.x,tc.y); }
 	inline void AddVertexQ2dTC(float x, float y, float tx, float ty, const unsigned char* c);
+	inline void AddVertexQ2L(const float4& p, const float3& n, const float4& uv, const unsigned char* c0, const unsigned char* c1);
 
 	// 3rd and newest API
 	// it appends a block of size * sizeof(T) at the end of the VA and returns the typed address to it
@@ -160,6 +171,7 @@ public:
 	void DrawArray2dT(const int drawType, unsigned int stride = sizeof(float) * VA_SIZE_2DT);
 	void DrawArray2dTC(const int drawType, unsigned int stride = sizeof(float) * VA_SIZE_2DTC);
 	void DrawArray2dT(const int drawType, StripCallback callback, void* data, unsigned int stride = sizeof(float) * VA_SIZE_2DT);
+	void DrawArrayL(const int drawType, unsigned int stride = sizeof(float) * VA_SIZE_L);
 
 	// same as EndStrip, but without automated EnlargeStripArray
 	void EndStrip();

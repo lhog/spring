@@ -8,12 +8,15 @@
 //    requires the ARB_imaging extension)
 // - use materials instead of raw calls (again, handle dlists)
 
-#include "Rendering/GL/myGL.h"
+//#include "Rendering/GL/myGL.h"
+
 #include <string>
 #include <vector>
 #include <algorithm>
+#include <optional>
 
 #include "lib/fmt/format.h"
+#include "lib/sol2/sol.hpp"
 
 #include "LuaOpenGL.h"
 
@@ -30,15 +33,18 @@
 #include "LuaShaders.h"
 #include "LuaTextures.h"
 #include "LuaUtils.h"
+#include "LuaVAO.hpp"
 //FIXME#include "LuaVBOs.h"
 #include "Game/Camera.h"
 #include "Game/CameraHandler.h"
 #include "Game/UI/CommandColors.h"
 #include "Game/UI/MiniMap.h"
+
 #include "Map/BaseGroundDrawer.h"
 #include "Map/HeightMapTexture.h"
 #include "Map/MapInfo.h"
 #include "Map/ReadMap.h"
+
 #include "Rendering/Fonts/glFont.h"
 #include "Rendering/GlobalRendering.h"
 #include "Rendering/LineDrawer.h"
@@ -58,6 +64,7 @@
 #include "Rendering/Textures/NamedTextures.h"
 #include "Rendering/Textures/3DOTextureHandler.h"
 #include "Rendering/Textures/S3OTextureHandler.h"
+
 #include "Sim/Features/Feature.h"
 #include "Sim/Features/FeatureDef.h"
 #include "Sim/Features/FeatureDefHandler.h"
@@ -68,6 +75,7 @@
 #include "Sim/Units/UnitDefHandler.h"
 #include "Sim/Units/UnitHandler.h"
 #include "Sim/Weapons/WeaponDefHandler.h"
+
 #include "System/Config/ConfigHandler.h"
 #include "System/Log/ILog.h"
 #include "System/Matrix44f.h"
@@ -101,6 +109,7 @@ float LuaOpenGL::screenDistance = 0.60f; // eye-to-screen (meters)
 
 static float3 screenViewTrans;
 
+std::vector<LuaOpenGL::LuaVertexArray*> LuaOpenGL::luaVertexArrays;
 std::vector<LuaOpenGL::OcclusionQuery*> LuaOpenGL::occlusionQueries;
 
 
@@ -197,6 +206,8 @@ void LuaOpenGL::Init()
 		deprecatedGLWarned.reserve(4096); // deprecated calls are logged along with caller information
 
 	deprecatedGLWarned.clear();
+
+	luaVertexArrays.reserve(2048);
 }
 
 void LuaOpenGL::Free()
@@ -207,11 +218,16 @@ void LuaOpenGL::Free()
 	if (!globalRendering->haveGLSL)
 		return;
 
-	for (const OcclusionQuery* q: occlusionQueries) {
+	for (const auto q: occlusionQueries) {
 		glDeleteQueries(1, &q->id);
 	}
 
+	for (const auto& lva : luaVertexArrays) {
+		glDeleteVertexArrays(1, &lva->vaoID);
+	}
+
 	occlusionQueries.clear();
+	luaVertexArrays.clear(); //destructor for stored objects is called here (?)
 }
 
 /******************************************************************************/
@@ -418,11 +434,18 @@ bool LuaOpenGL::PushEntries(lua_State* L)
 	 	LuaRBOs::PushEntries(L);
 	}
 
+	LuaVAO::PushEntries(L);
+
 	LuaFonts::PushEntries(L);
 
 //FIXME		LuaVBOs::PushEntries(L);
 
 	return true;
+}
+
+bool LuaOpenGL::PostPushEntries(lua_State* L)
+{
+	return LuaVAO::PostPushEntries(L);
 }
 
 
@@ -1089,10 +1112,10 @@ inline void LuaOpenGL::CondWarnDeprecatedGL(lua_State* L, const char* caller)
 	if (deprecatedGLWarned.find(key) == deprecatedGLWarned.end()) {
 		deprecatedGLWarned.emplace(key);
 		if (deprecatedGLWarnLevel == 1) {
-			LOG("gl. %s: Attempt to call a deprecated OpenGL function from Lua OpenGL", caller);
+			LOG("gl.%s: Attempt to call a deprecated OpenGL function from Lua OpenGL", caller);
 		}
 		else {
-			LOG("gl. %s: Attempt to call a deprecated OpenGL function from Lua OpenGL in %s", caller, luaCaller.c_str());
+			LOG("gl.%s: Attempt to call a deprecated OpenGL function from Lua OpenGL in %s", caller, luaCaller.c_str());
 		}
 	}
 }
@@ -3721,28 +3744,150 @@ int LuaOpenGL::SwapBuffers(lua_State* L)
 
 int LuaOpenGL::CreateVertexArray(lua_State* L)
 {
-	CheckDrawingEnabled(L, __func__);
-	NotImplementedError(L, __func__);
-	return 0;
+	return sol::stack::call_lua(L, 1, [=](const int numElements, const int numIndices, const std::optional<bool> optPersistent) {
+
+		if (numElements <= 0)
+			return sol::object(L, sol::in_place, sol::lua_nil);
+
+		const auto lva = new LuaVertexArray;
+
+		const auto persistent = optPersistent.value_or(false);
+		const auto usage = persistent ? GL_DYNAMIC_DRAW : GL_STATIC_DRAW; //make some assumptions how frequent buffers will be updated, persistent buffers will be updated more frequently
+
+		lva->vboP.immutableStorage = persistent;
+		lva->vboN.immutableStorage = persistent;
+		lva->vboUV.immutableStorage = persistent;
+		lva->vboC0.immutableStorage = persistent;
+		lva->vboC1.immutableStorage = persistent;
+
+		glGenVertexArrays(1, &lva->vaoID);
+		glBindVertexArray(lva->vaoID);
+
+		auto elemBufferInit = [=](VBO& vbo, const int attrIdx, const int eSize, const int eCount, const GLuint eType, const GLboolean eNorm) {
+			vbo.Bind(GL_ARRAY_BUFFER);
+
+			glEnableVertexAttribArray(attrIdx);
+			glVertexAttribPointer(attrIdx, eSize, eType, eNorm, 0, 0);
+
+			vbo.New(numElements * eSize * eType, usage, nullptr);
+			vbo.Unbind();
+		};
+
+		elemBufferInit(lva->vboP, 0, sizeof(float), 4, GL_FLOAT, GL_FALSE);
+		elemBufferInit(lva->vboN, 1, sizeof(float), 3, GL_FLOAT, GL_FALSE);
+		elemBufferInit(lva->vboUV, 2, sizeof(float), 4, GL_FLOAT, GL_FALSE);
+		elemBufferInit(lva->vboC0, 3, sizeof(std::uint8_t), 4, GL_UNSIGNED_BYTE, GL_TRUE);
+		elemBufferInit(lva->vboC1, 4, sizeof(std::uint8_t), 4, GL_UNSIGNED_BYTE, GL_TRUE);
+
+		if (numIndices > 0) {
+			lva->vboIndices.immutableStorage = persistent;
+			lva->vboIndices.Bind(GL_ELEMENT_ARRAY_BUFFER);
+			lva->vboIndices.New(numIndices * sizeof(int), usage, nullptr);
+			lva->vboIndices.Unbind();
+		}
+
+		glBindVertexArray(0);
+
+		for (int i = 0; i <= 4; ++i)
+			glDisableVertexAttribArray(i);
+
+		const auto replaceIter = std::find_if(std::begin(luaVertexArrays), std::end(luaVertexArrays), [](LuaVertexArray* lva) { return lva == nullptr; });
+		if (replaceIter != std::end(luaVertexArrays))
+			*replaceIter = lva;
+		else
+			luaVertexArrays.emplace_back(lva);
+
+		return sol::object(L, sol::in_place, std::distance(std::begin(luaVertexArrays), replaceIter)); //from 0 to size-1
+	});
 }
 
 int LuaOpenGL::DeleteVertexArray(lua_State* L)
 {
-	CheckDrawingEnabled(L, __func__);
-	NotImplementedError(L, __func__);
-	return 0;
+	return sol::stack::call_lua(L, 1, [=](const int bufferIdx) {
+		if ((bufferIdx < 0) || (bufferIdx >= luaVertexArrays.size()))
+			return false;
+
+		const auto lva = luaVertexArrays[bufferIdx];
+		if (lva) {
+			delete lva; //vbo destructors are called here;
+			glDeleteVertexArrays(1, &lva->vaoID);
+
+			luaVertexArrays[bufferIdx] = nullptr; //gap indicator
+			return true;
+		}
+
+		return false;
+	});
 }
 
 int LuaOpenGL::UpdateVertexArray(lua_State* L)
 {
-	CheckDrawingEnabled(L, __func__);
-	NotImplementedError(L, __func__);
-	return 0;
+	return sol::stack::call_lua(L, 1, [=](int bufferIdx, int elementPos, int indexPos, sol::object updateObj) {
+		if ((bufferIdx < 0) || (bufferIdx >= luaVertexArrays.size()))
+			return false;
+
+		const auto lva = luaVertexArrays[bufferIdx];
+
+		const auto memBufSize = std::max(lva->vboP.GetSize(), lva->vboIndices.GetSize());
+
+		//this code below is a shame
+		const auto elemByteOffsetF4 = elementPos * 4 * sizeof(float);
+		const auto elemByteOffsetF3 = elementPos * 3 * sizeof(float);
+		const auto elemByteOffsetB4 = elementPos * 3 * sizeof(std::uint8_t);
+		const auto indexByteOffset = indexPos * 4 * sizeof(std::uint8_t);
+
+		void* memBuf = malloc(memBufSize);
+
+		const auto updateFunc = [](VBO& vbo, void* memBuf, const int byteOffset, const int arraySize) {
+			vbo.Bind();
+			const auto vboBuf = vbo.MapBuffer(GL_MAP_WRITE_BIT);
+
+			//std::copy(vec.cbegin(), vec.cbegin() + vbo.GetSize(), vboBuf);
+			memcpy(vboBuf, reinterpret_cast<std::uint8_t*>(memBuf) + byteOffset, vbo.GetSize() - byteOffset);
+
+			vbo.UnmapBuffer();
+			vbo.Unbind();
+		};
+
+		//updateFunc(lva->vboP, elemByteOffsetF4, memBuf);
+		//updateFunc(lva->vboN, elemByteOffsetF3, memBuf);
+		//updateFunc(lva->vboUV, elemByteOffsetF4, memBuf);
+		//updateFunc(lva->vboC0, elemByteOffsetB4, memBuf);
+		//updateFunc(lva->vboC1, elemByteOffsetB4, memBuf);
+		//updateFunc(lva->vboC1, indexByteOffset, memBuf);
+
+		free(memBuf);
+
+		return true;
+	});
 }
 
 int LuaOpenGL::RenderVertexArray(lua_State* L)
 {
 	CheckDrawingEnabled(L, __func__);
+
+	const int primType = 0;
+
+	switch (primType) {
+		case GL_POINTS:
+		case GL_LINE_STRIP:
+		case GL_LINE_LOOP:
+		case GL_LINES:
+		case GL_LINE_STRIP_ADJACENCY:
+		case GL_LINES_ADJACENCY:
+		case GL_TRIANGLE_STRIP:
+		case GL_TRIANGLE_FAN:
+		case GL_TRIANGLES:
+		case GL_TRIANGLE_STRIP_ADJACENCY:
+		case GL_TRIANGLES_ADJACENCY:
+		case GL_PATCHES:
+			break;
+		default: {
+			luaL_error(L, "%s(): Using deprecated primType (%d)", __func__, primType);
+			return 0;
+		}
+	}
+
 	NotImplementedError(L, __func__);
 	return 0;
 }

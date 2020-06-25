@@ -2,7 +2,7 @@
 
 // calls to this function will be removed by the optimizer unless the size is too small
 void CVertexArray::CheckInitSize(const unsigned int vertexes, const unsigned int strips) {
-	if(vertexes>VA_INIT_VERTEXES || strips>VA_INIT_STRIPS) { 
+	if(vertexes>VA_INIT_VERTEXES || strips>VA_INIT_STRIPS) {
 		handleerror(drawArrayPos=NULL, "Vertex array initial size is too small", "Rendering error", MBF_OK | MBF_EXCL);
 	}
 }
@@ -124,6 +124,15 @@ void CVertexArray::AddVertexQ2dTC(float x, float y, float tx, float ty, const un
 	vat->c = SColor(c);
 }
 
+void CVertexArray::AddVertexQ2L(const float4& p, const float3& n, const float4& uv, const unsigned char* c0, const unsigned char* c1) {
+	ASSERT_SIZE(VA_SIZE_L)
+	VA_TYPE_L* vat = GetTypedVertexArrayQ<VA_TYPE_L>(1);
+	vat->p = p;
+	vat->n = n;
+	vat->uv = uv;
+	vat->c0 = SColor(c0);
+	vat->c1 = SColor(c1);
+}
 
 
 //////////////////////////////////////////////////////////////////////
@@ -183,6 +192,11 @@ void CVertexArray::AddVertex2dT(float x, float y, float tx, float ty) {
 void CVertexArray::AddVertex2dTC(float x, float y, float tx, float ty, const unsigned char* col) {
 	CheckEnlargeDrawArray(VA_SIZE_2DTC * sizeof(float)); // sizeof(VA_TYPE_2DTC)
 	AddVertexQ2dTC(x, y, tx, ty, col);
+}
+
+void CVertexArray::AddVertex2L(const float4& p, const float3& n, const float4& uv, const unsigned char* c0, const unsigned char* c1) {
+	CheckEnlargeDrawArray(VA_SIZE_L * sizeof(float)); // sizeof(VA_TYPE_L)
+	AddVertexQ2L(p, n, uv, c0, c1);
 }
 
 
