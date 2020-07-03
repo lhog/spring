@@ -30,8 +30,6 @@ struct VAOAttrib {
 
 class LuaVAOImpl {
 public:
-	static constexpr int _GL_MAX_VERTEX_ATTRIBS = 16;
-public:
 	LuaVAOImpl() = delete;
 	LuaVAOImpl(const sol::optional<bool> freqUpdatedOpt);
 
@@ -39,9 +37,6 @@ public:
 	LuaVAOImpl(LuaVAOImpl&& lva) = default; //move cons
 
 	~LuaVAOImpl();
-public:
-	template <typename  TIn, typename  TOut>
-	static TOut TransformFunc(const TIn input);
 public:
 	int SetVertexAttributes(const int maxAttrCount, const sol::table& attrDefTable);
 	int SetInstanceAttributes(const int maxAttrCount, const sol::table& attrDefTable);
@@ -64,8 +59,12 @@ private:
 	int UploadImpl(const sol::table& luaTblData, const sol::optional<int> offsetOpt, const int divisor, const int* attrNum, const int aSizeInBytes, VBO* vbo);
 	void FillAttribTables(const sol::table& attrDefTable, const int divisor, int* attribsSizeInBytes);
 private:
-	const static GLenum defaultVertexType = GL_FLOAT;
-	const static GLenum defaultIndexType = GL_UNSIGNED_SHORT;
+	template <typename  TIn, typename  TOut>
+	static TOut TransformFunc(const TIn input);
+private:
+	static constexpr int glMaxNumOfAttributes = 16;
+	static constexpr GLenum defaultVertexType = GL_FLOAT;
+	static constexpr GLenum defaultIndexType = GL_UNSIGNED_SHORT;
 private:
 	int numAttributes;
 

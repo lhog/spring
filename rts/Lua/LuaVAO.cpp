@@ -70,12 +70,12 @@ void LuaVAOImpl::FillAttribTables(const sol::table& attrDefTable, const int divi
 		if (key.get_type() != sol::type::number || value.get_type() != sol::type::table) //key should be int, value should be table i.e. [1] = {}
 			continue;
 
-		if (numAttributes >= _GL_MAX_VERTEX_ATTRIBS)
+		if (numAttributes >= LuaVAOImpl::glMaxNumOfAttributes)
 			return;
 
 		const int vaIndex = key.as<int>();
 
-		if ((vaIndex < 0) || (vaIndex > _GL_MAX_VERTEX_ATTRIBS))
+		if ((vaIndex < 0) || (vaIndex > LuaVAOImpl::glMaxNumOfAttributes))
 			return;
 
 		sol::table vaDefTable = value.as<sol::table>();
