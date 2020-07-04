@@ -38,8 +38,8 @@ public:
 
 	~LuaVAOImpl();
 public:
-	int SetVertexAttributes(const int maxAttrCount, const sol::table& attrDefTable);
-	int SetInstanceAttributes(const int maxAttrCount, const sol::table& attrDefTable);
+	int SetVertexAttributes(const int maxVertCount, const sol::table& attrDefTable);
+	int SetInstanceAttributes(const int maxInstCount, const sol::table& attrDefTable);
 	bool SetIndexAttributes(const int maxIndxCount, const sol::optional<GLenum> indTypeOpt);
 
 	int UploadVertexBulk(const sol::table& bulkData, const sol::optional<int> vertexOffsetOpt);

@@ -164,7 +164,7 @@ void LuaVAOImpl::FillAttribTables(const sol::table& attrDefTable, const int divi
 	}
 }
 
-int LuaVAOImpl::SetVertexAttributes(const int maxAttrCount, const sol::table& attrDefTable)
+int LuaVAOImpl::SetVertexAttributes(const int maxVertCount, const sol::table& attrDefTable)
 {
 	if (vboVert)
 		return 0;
@@ -172,7 +172,7 @@ int LuaVAOImpl::SetVertexAttributes(const int maxAttrCount, const sol::table& at
 	if (maxAttrCount <= 0)
 		return 0;
 
-	this->maxVertCount = maxAttrCount;
+	this->maxVertCount = maxVertCount;
 
 	FillAttribTables(attrDefTable, 0/*per vertex divisor*/, &this->vertAttribsSizeInBytes);
 
@@ -187,7 +187,7 @@ int LuaVAOImpl::SetVertexAttributes(const int maxAttrCount, const sol::table& at
 	return numAttributes;
 }
 
-int LuaVAOImpl::SetInstanceAttributes(const int maxAttrCount, const sol::table& attrDefTable)
+int LuaVAOImpl::SetInstanceAttributes(const int maxInstCount, const sol::table& attrDefTable)
 {
 	if (vboInst)
 		return 0;
