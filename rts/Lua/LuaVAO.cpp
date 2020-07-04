@@ -47,7 +47,7 @@ inline LuaVAOImpl::~LuaVAOImpl()
 
 template<typename TIn, typename TOut>
 inline TOut LuaVAOImpl::TransformFunc(const TIn input) {
-	if (std::is_same<TIn, TOut>::value)
+	if constexpr(std::is_same<TIn, TOut>::value)
 		return input;
 
 	const auto m = static_cast<TIn>(std::numeric_limits<TOut>::min());
