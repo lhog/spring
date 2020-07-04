@@ -56,6 +56,14 @@ inline TOut LuaVAOImpl::TransformFunc(const TIn input) {
 	return static_cast<TOut>(std::clamp(input, m, M));
 }
 
+
+template<typename T>
+inline T LuaVAOImpl::MaybeFunc(const sol::table& tbl, const std::string& key, T defValue) {
+	const sol::optional<T> maybeValue = tbl[key];
+	return maybeValue.value_or(defValue);
+}
+
+
 /**
 * local vertexAtrribs = {
 *		[0] = {type = GL.FLOAT, ...}
@@ -80,16 +88,10 @@ void LuaVAOImpl::FillAttribTables(const sol::table& attrDefTable, const int divi
 
 		sol::table vaDefTable = value.as<sol::table>();
 
-		// GCC specific extension
-		const auto maybeFunc = [=] <typename T> (const std::string & paramName, T defValue) {
-			const sol::optional<T> maybeValue = vaDefTable[paramName];
-			return maybeValue.value_or(defValue);
-		};
-
-		const GLenum type = maybeFunc("type", LuaVAOImpl::defaultVertexType);
-		const GLboolean normalized = maybeFunc("normalized", false) ? GL_TRUE : GL_FALSE;
-		const GLint size = std::clamp(maybeFunc("size", 4), 1, 4);
-		const std::string name = maybeFunc("name", fmt::format("attr{}", vaIndex));
+		const GLenum type = MaybeFunc(vaDefTable, "type", LuaVAOImpl::defaultVertexType);
+		const GLboolean normalized = MaybeFunc(vaDefTable, "normalized", false) ? GL_TRUE : GL_FALSE;
+		const GLint size = std::clamp(MaybeFunc(vaDefTable, "size", 4), 1, 4);
+		const std::string name = MaybeFunc(vaDefTable, "name", fmt::format("attr{}", vaIndex));
 
 		int typeSizeInBytes = 0;
 
@@ -373,6 +375,9 @@ int LuaVAOImpl::UploadImpl(const sol::table& luaTblData, const sol::optional<int
 
 	const int byteSize = vbo->GetSize() - byteOffset; //non-precise, but save way
 
+	if (byteSize <= 0)
+		return 0;
+
 	int bytesWritten = 0;
 
 	std::vector<lua_Number> dataVec;
@@ -480,6 +485,9 @@ int LuaVAOImpl::UploadIndices(const sol::table& indData, const sol::optional<int
 	const int byteOffset = aOffset * indElemSizeInBytes;
 
 	const int byteSize = ebo->GetSize() - byteOffset; //non-precise, but save way
+
+	if (byteSize <= 0)
+		return 0;
 
 	int bytesWritten = 0;
 

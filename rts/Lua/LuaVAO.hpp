@@ -61,6 +61,9 @@ private:
 private:
 	template <typename  TIn, typename  TOut>
 	static TOut TransformFunc(const TIn input);
+
+	template<typename T>
+	static T MaybeFunc(const sol::table& tbl, const std::string& key, T defValue);
 private:
 	static constexpr int glMaxNumOfAttributes = 16;
 	static constexpr GLenum defaultVertexType = GL_FLOAT;
