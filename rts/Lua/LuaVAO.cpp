@@ -75,23 +75,23 @@ void LuaVAOImpl::FillAttribTables(const sol::table& attrDefTable, const int divi
 		const sol::object& key = kv.first;
 		const sol::object& value = kv.second;
 
-		if (key.get_type() != sol::type::number || value.get_type() != sol::type::table) //key should be int, value should be table i.e. [1] = {}
-			continue;
-
 		if (numAttributes >= LuaVAOImpl::glMaxNumOfAttributes)
 			return;
 
-		const int vaIndex = key.as<int>();
-
-		if ((vaIndex < 0) || (vaIndex > LuaVAOImpl::glMaxNumOfAttributes))
-			return;
+		if (key.get_type() != sol::type::number || value.get_type() != sol::type::table) //key should be int, value should be table i.e. [1] = {}
+			continue;
 
 		sol::table vaDefTable = value.as<sol::table>();
+
+		const int attrID = MaybeFunc(vaDefTable, "id", numAttributes);
+
+		if ((attrID < 0) || (attrID > LuaVAOImpl::glMaxNumOfAttributes) || vaoAttribs.find(attrID) != vaoAttribs.end())
+			continue;
 
 		const GLenum type = MaybeFunc(vaDefTable, "type", LuaVAOImpl::defaultVertexType);
 		const GLboolean normalized = MaybeFunc(vaDefTable, "normalized", false) ? GL_TRUE : GL_FALSE;
 		const GLint size = std::clamp(MaybeFunc(vaDefTable, "size", 4), 1, 4);
-		const std::string name = MaybeFunc(vaDefTable, "name", fmt::format("attr{}", vaIndex));
+		const std::string name = MaybeFunc(vaDefTable, "name", fmt::format("attr{}", attrID));
 
 		int typeSizeInBytes = 0;
 
@@ -116,7 +116,7 @@ void LuaVAOImpl::FillAttribTables(const sol::table& attrDefTable, const int divi
 		if (typeSizeInBytes == 0)
 			continue;
 
-		vaoAttribs[vaIndex] = {
+		vaoAttribs[attrID] = {
 			divisor,
 			size,
 			type,
@@ -128,6 +128,7 @@ void LuaVAOImpl::FillAttribTables(const sol::table& attrDefTable, const int divi
 			name
 		};
 
+		++numAttributes;
 	}
 
 	*attribsSizeInBytes = 0;
@@ -150,8 +151,6 @@ void LuaVAOImpl::FillAttribTables(const sol::table& attrDefTable, const int divi
 		//LOG("numAttributes=%d,attribSizeInBytes=%d,attribsSizeInBytes=%d,pointer=%d", numAttributes, attribSizeInBytes, *attribsSizeInBytes, attr.pointer);
 
 		pointer += attribSizeInBytes; //the pointer points to the next attrib
-
-		++numAttributes;
 	}
 
 	//third pass is need to fill in stride value, which is same as sizeof imaginary attribs structure
@@ -169,7 +168,7 @@ int LuaVAOImpl::SetVertexAttributes(const int maxVertCount, const sol::table& at
 	if (vboVert)
 		return 0;
 
-	if (maxAttrCount <= 0)
+	if (maxVertCount <= 0)
 		return 0;
 
 	this->maxVertCount = maxVertCount;
@@ -192,10 +191,10 @@ int LuaVAOImpl::SetInstanceAttributes(const int maxInstCount, const sol::table& 
 	if (vboInst)
 		return 0;
 
-	if (maxAttrCount <= 0)
+	if (maxInstCount <= 0)
 		return 0;
 
-	this->maxInstCount = maxAttrCount;
+	this->maxInstCount = maxInstCount;
 
 	FillAttribTables(attrDefTable, 1/*per instance divisor*/, &this->instAttribsSizeInBytes);
 
