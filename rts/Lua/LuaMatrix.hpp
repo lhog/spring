@@ -133,7 +133,8 @@ public:
 	}
 
 public:
-	const CMatrix44f& GetMatRef() const { return mat; }
+	const CMatrix44f& GetMatRef() const { return  mat; }
+	const CMatrix44f* GetMatPtr() const { return &mat; }
 public:
 	sol::as_table_t<std::vector<float>> operator* (const sol::table& tbl) const {
 		float4 f4 { 0.0f, 0.0f, 0.0f, 1.0f };
@@ -196,4 +197,4 @@ public:
 };
 
 
-#endif //LUA_VAO_H
+#endif //LUA_MATRIX_H
