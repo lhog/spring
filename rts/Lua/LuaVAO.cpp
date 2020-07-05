@@ -78,7 +78,7 @@ void LuaVAOImpl::FillAttribTables(const sol::table& attrDefTable, const int divi
 		if (numAttributes >= LuaVAOImpl::glMaxNumOfAttributes)
 			return;
 
-		if (key.get_type() != sol::type::number || value.get_type() != sol::type::table) //key should be int, value should be table i.e. [1] = {}
+		if (!key.is<int>() || value.get_type() != sol::type::table) //key should be int, value should be table i.e. [1] = {}
 			continue;
 
 		sol::table vaDefTable = value.as<sol::table>();

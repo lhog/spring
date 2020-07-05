@@ -6,9 +6,6 @@
 
 #include "System/type2.h"
 
-#include "Sim/Features/Feature.h"
-#include "Sim/Units/Unit.h"
-
 #include "Sim/Objects/SolidObject.h"
 #include "Sim/Features/FeatureHandler.h"
 #include "Sim/Units/UnitHandler.h"
@@ -24,25 +21,21 @@
 
 LuaMatrixEventsListeners LuaMatrixImpl::lmel = LuaMatrixEventsListeners{};
 
-LuaMatrixImpl::LuaMatrixImpl(const float m0, const float m1, const float m2, const float m3, const float m4, const float m5, const float m6, const float m7, const float m8, const float m9, const float m10, const float m11, const float m12, const float m13, const float m14, const float m15)
-{
-#define MAT_EQ_M(i) mat[i] = m##i
-	MAT_EQ_M(0); MAT_EQ_M(1); MAT_EQ_M(2); MAT_EQ_M(3);
-	MAT_EQ_M(4); MAT_EQ_M(5); MAT_EQ_M(6); MAT_EQ_M(7);
-	MAT_EQ_M(8); MAT_EQ_M(9); MAT_EQ_M(10); MAT_EQ_M(11);
-	MAT_EQ_M(12); MAT_EQ_M(13); MAT_EQ_M(14); MAT_EQ_M(15);
-#undef MAT_EQ_M
-}
+CMatrix44f LuaMatrixImpl::screenViewMatrix = CMatrix44f{};
+CMatrix44f LuaMatrixImpl::screenProjMatrix = CMatrix44f{};
 
 void LuaMatrixImpl::Zero()
 {
-	//std::fill(&mat[0], &mat[0] + sizeof(CMatrix44f) / sizeof(float), 0.0f);
-#define MAT_EQ_0(i) mat[i] = 0.0f
-	MAT_EQ_0(0); MAT_EQ_0(1); MAT_EQ_0(2); MAT_EQ_0(3);
-	MAT_EQ_0(4); MAT_EQ_0(5); MAT_EQ_0(6); MAT_EQ_0(7);
-	MAT_EQ_0(8); MAT_EQ_0(9); MAT_EQ_0(10); MAT_EQ_0(11);
-	MAT_EQ_0(12); MAT_EQ_0(13); MAT_EQ_0(14); MAT_EQ_0(15);
-#undef MAT_EQ_0
+#if 1
+	std::fill(&mat[0], &mat[0] + 16, 0.0f);
+#else
+	#define MAT_EQ_0(i) mat[i] = 0.0f
+		MAT_EQ_0(0); MAT_EQ_0(1); MAT_EQ_0(2); MAT_EQ_0(3);
+		MAT_EQ_0(4); MAT_EQ_0(5); MAT_EQ_0(6); MAT_EQ_0(7);
+		MAT_EQ_0(8); MAT_EQ_0(9); MAT_EQ_0(10); MAT_EQ_0(11);
+		MAT_EQ_0(12); MAT_EQ_0(13); MAT_EQ_0(14); MAT_EQ_0(15);
+	#undef MAT_EQ_0
+#endif
 }
 
 void LuaMatrixImpl::Translate(const float x, const float y, const float z)
@@ -124,6 +117,18 @@ inline const LocalModelPiece* LuaMatrixImpl::ParseObjectConstLocalModelPiece(con
 
 ///////////////////////////////////////////////////////////
 
+template<typename TFunc>
+inline void LuaMatrixImpl::AssignOrMultMatImpl(const sol::optional<bool> mult, const bool multDefault, const TFunc& tfunc)
+{
+	const bool multVal = mult.value_or(multDefault);
+	if (!multVal)
+		mat = tfunc();
+	else {
+		CMatrix44f tmpMat = tfunc();
+		mat *= tmpMat;
+	}
+}
+
 template<typename TObj>
 inline const TObj* LuaMatrixImpl::GetObjectImpl(const unsigned int objID, sol::this_state L)
 {
@@ -152,20 +157,18 @@ inline bool LuaMatrixImpl::GetObjectMatImpl(const unsigned int objID, CMatrix44f
 }
 
 template<typename TObj>
-inline bool LuaMatrixImpl::LoadObjectMatImpl(const unsigned int objID, sol::this_state L)
+inline bool LuaMatrixImpl::ObjectMatImpl(const unsigned int objID, bool mult, sol::this_state L)
 {
-	return GetObjectMatImpl<TObj>(objID, mat, L);
-}
+	if (!mult)
+		return GetObjectMatImpl<TObj>(objID, mat, L);
+	else {
+		CMatrix44f mat2;
+		if (!GetObjectMatImpl<TObj>(objID, mat2, L))
+			return false;
 
-template<typename TObj>
-inline bool LuaMatrixImpl::MultObjectMatImpl(const unsigned int objID, sol::this_state L)
-{
-	CMatrix44f mat2;
-	if (!GetObjectMatImpl<TObj>(objID, mat2, L))
-		return false;
-
-	mat *= mat2;
-	return true;
+		mat *= mat2;
+		return true;
+	}
 }
 
 template<typename TObj>
@@ -186,20 +189,18 @@ inline bool LuaMatrixImpl::GetObjectPieceMatImpl(const unsigned int objID, const
 }
 
 template<typename TObj>
-inline bool LuaMatrixImpl::LoadObjectPieceMatImpl(const unsigned int objID, const unsigned int pieceNum, sol::this_state L)
+inline bool LuaMatrixImpl::ObjectPieceMatImpl(const unsigned int objID, const unsigned int pieceNum, bool mult, sol::this_state L)
 {
-	return GetObjectPieceMatImpl<TObj>(objID, pieceNum, mat, L);
-}
+	if (!mult)
+		return GetObjectPieceMatImpl<TObj>(objID, pieceNum, mat, L);
+	else {
+		CMatrix44f mat2;
+		if (!GetObjectPieceMatImpl<TObj>(objID, pieceNum, mat2, L))
+			return false;
 
-template<typename TObj>
-inline bool LuaMatrixImpl::MultObjectPieceMatImpl(const unsigned int objID, const unsigned int pieceNum, sol::this_state L)
-{
-	CMatrix44f mat2;
-	if (!GetObjectPieceMatImpl<TObj>(objID, pieceNum, mat2, L))
-		return false;
-
-	mat *= mat2;
-	return true;
+		mat *= mat2;
+		return true;
+	}
 }
 
 inline void LuaMatrixImpl::CondSetupScreenMatrices() {
@@ -233,48 +234,10 @@ inline void LuaMatrixImpl::CondSetupScreenMatrices() {
 	const float top = ((vpy + vsy) - hssy) * zfact;
 
 	// translate s.t. (0,0,0) is on the zplane, on the window's bottom-left corner
-	screenViewMatrix = CMatrix44f{ float3{left / zfact, bottom / zfact, -zplane} };
-	screenProjMatrix = CMatrix44f::ClipControl(globalRendering->supportClipSpaceControl) * CMatrix44f::PerspProj(left, right, bottom, top, znear, zfar);
-}
+	LuaMatrixImpl::screenViewMatrix = CMatrix44f{ float3{left / zfact, bottom / zfact, -zplane} };
+	LuaMatrixImpl::screenProjMatrix = CMatrix44f::ClipControl(globalRendering->supportClipSpaceControl) * CMatrix44f::PerspProj(left, right, bottom, top, znear, zfar);
 
-bool LuaMatrixImpl::LoadUnit(const unsigned int unitID, sol::this_state L)
-{
-	return LoadObjectMatImpl<CUnit>(unitID, L);
-}
-
-bool LuaMatrixImpl::MultUnit(const unsigned int unitID, sol::this_state L)
-{
-	return MultObjectMatImpl<CUnit>(unitID, L);
-}
-
-bool LuaMatrixImpl::LoadUnitPiece(const unsigned int unitID, const unsigned int pieceNum, sol::this_state L)
-{
-	return LoadObjectPieceMatImpl<CUnit>(unitID, pieceNum, L);
-}
-
-bool LuaMatrixImpl::MultUnitPiece(const unsigned int unitID, const unsigned int pieceNum, sol::this_state L)
-{
-	return MultObjectPieceMatImpl<CUnit>(unitID, pieceNum, L);
-}
-
-bool LuaMatrixImpl::LoadFeature(const unsigned int featureID, sol::this_state L)
-{
-	return LoadObjectMatImpl<CFeature>(featureID, L);
-}
-
-bool LuaMatrixImpl::MultFeature(const unsigned int featureID, sol::this_state L)
-{
-	return MultObjectMatImpl<CFeature>(featureID, L);
-}
-
-bool LuaMatrixImpl::LoadFeaturePiece(const unsigned int featureID, const unsigned int pieceNum, sol::this_state L)
-{
-	return LoadObjectPieceMatImpl<CFeature>(featureID, pieceNum, L);
-}
-
-bool LuaMatrixImpl::MultFeaturePiece(const unsigned int featureID, const unsigned int pieceNum, sol::this_state L)
-{
-	return MultObjectPieceMatImpl<CFeature>(featureID, pieceNum, L);
+	lmel.ResetViewResized();
 }
 
 void LuaMatrixImpl::ScreenViewMatrix()
@@ -289,44 +252,28 @@ void LuaMatrixImpl::ScreenProjMatrix()
 	mat = screenProjMatrix;
 }
 
-void LuaMatrixImpl::LoadOrtho(const float left, const float right, const float bottom, const float top, const float near, const float far)
+void LuaMatrixImpl::Ortho(const float left, const float right, const float bottom, const float top, const float near, const float far, const sol::optional<bool> mult)
 {
-	mat = CMatrix44f::ClipOrthoProj(left, right, bottom, top, near, far, globalRendering->supportClipSpaceControl * 1.0f);
+	const auto lambda = [=]() { return CMatrix44f::ClipOrthoProj(left, right, bottom, top, near, far, globalRendering->supportClipSpaceControl * 1.0f); };
+	AssignOrMultMatImpl(mult, LuaMatrixImpl::viewProjMultDefault, lambda);
 }
 
-void LuaMatrixImpl::MultOrtho(const float left, const float right, const float bottom, const float top, const float near, const float far)
+void LuaMatrixImpl::Frustum(const float left, const float right, const float bottom, const float top, const float near, const float far, const sol::optional<bool> mult)
 {
-	mat *= CMatrix44f::ClipOrthoProj(left, right, bottom, top, near, far, globalRendering->supportClipSpaceControl * 1.0f);
+	const auto lambda = [=]() { return CMatrix44f::ClipPerspProj(left, right, bottom, top, near, far, globalRendering->supportClipSpaceControl * 1.0f); };
+	AssignOrMultMatImpl(mult, LuaMatrixImpl::viewProjMultDefault, lambda);
 }
 
-void LuaMatrixImpl::LoadFrustum(const float left, const float right, const float bottom, const float top, const float near, const float far)
-{
-	mat = CMatrix44f::ClipPerspProj(left, right, bottom, top, near, far, globalRendering->supportClipSpaceControl * 1.0f);
-}
-
-void LuaMatrixImpl::MultFrustum(const float left, const float right, const float bottom, const float top, const float near, const float far)
-{
-	mat *= CMatrix44f::ClipPerspProj(left, right, bottom, top, near, far, globalRendering->supportClipSpaceControl * 1.0f);
-}
-
-void LuaMatrixImpl::LoadBillboard(const std::optional<unsigned int> cameraIdOpt)
+void LuaMatrixImpl::Billboard(const sol::optional<unsigned int> cameraIdOpt, const sol::optional<bool> mult)
 {
 	constexpr unsigned int minCamType = CCamera::CAMTYPE_PLAYER;
 	constexpr unsigned int maxCamType = CCamera::CAMTYPE_ACTIVE;
 
 	const unsigned int camType = std::clamp(cameraIdOpt.value_or(maxCamType), minCamType, maxCamType);
 	const auto cam = CCameraHandler::GetCamera(camType);
-	mat = cam->GetBillBoardMatrix();
-}
 
-void LuaMatrixImpl::MultBillboard(const std::optional<unsigned int> cameraIdOpt)
-{
-	constexpr unsigned int minCamType = CCamera::CAMTYPE_PLAYER;
-	constexpr unsigned int maxCamType = CCamera::CAMTYPE_ACTIVE;
-
-	const unsigned int camType = std::clamp(cameraIdOpt.value_or(maxCamType), minCamType, maxCamType);
-	const auto cam = CCameraHandler::GetCamera(camType);
-	mat *= cam->GetBillBoardMatrix();
+	const auto lambda = [=]() { return cam->GetBillBoardMatrix(); };
+	AssignOrMultMatImpl(mult, LuaMatrixImpl::viewProjMultDefault, lambda);
 }
 
 ///////////////////////////////////////////////////////////
@@ -337,25 +284,26 @@ bool LuaMatrix::PostPushEntries(lua_State* L)
 	auto gl = lua.get<sol::table>("gl");
 
 	gl.new_usertype<LuaMatrixImpl>("LuaMatrixImpl",
+
 		sol::constructors<LuaMatrixImpl()>(),
+
 		"Zero", &LuaMatrixImpl::Zero,
 		"LoadZero", &LuaMatrixImpl::Zero,
 
 		"Identity", &LuaMatrixImpl::Identity,
 		"LoadIdentity", &LuaMatrixImpl::Identity,
 
-		"MultMat4", &LuaMatrixImpl::MultMat4,
-		"MultVec4", &LuaMatrixImpl::MultVec4,
-		"MultVec3", &LuaMatrixImpl::MultVec3,
+		"DeepCopy", &LuaMatrixImpl::DeepCopy,
+		"DeepCopyFrom", & LuaMatrixImpl::DeepCopyFrom,
 
-		"Mult", sol::overload(&LuaMatrixImpl::MultMat4, &LuaMatrixImpl::MultVec4, LuaMatrixImpl::MultVec3),
+		//"Mult", sol::overload(&LuaMatrixImpl::MultMat4, &LuaMatrixImpl::MultVec4, LuaMatrixImpl::MultVec3),
 
-		"InverseAffine", & LuaMatrixImpl::InverseAffine,
-		"InvertAffine", & LuaMatrixImpl::InverseAffine,
-		"Inverse", & LuaMatrixImpl::Inverse,
-		"Invert", & LuaMatrixImpl::Inverse,
+		"InverseAffine", &LuaMatrixImpl::InverseAffine,
+		"InvertAffine", &LuaMatrixImpl::InverseAffine,
+		"Inverse", &LuaMatrixImpl::Inverse,
+		"Invert", &LuaMatrixImpl::Inverse,
 
-		"Transpose", & LuaMatrixImpl::Transpose,
+		"Transpose", &LuaMatrixImpl::Transpose,
 
 		"Translate", &LuaMatrixImpl::Translate,
 		"Scale", &LuaMatrixImpl::Scale,
@@ -371,32 +319,28 @@ bool LuaMatrix::PostPushEntries(lua_State* L)
 		"RotateDegY", &LuaMatrixImpl::RotateDegY,
 		"RotateDegZ", &LuaMatrixImpl::RotateDegZ,
 
-		"LoadUnit", &LuaMatrixImpl::LoadUnit,
-		"MultUnit", &LuaMatrixImpl::MultUnit,
+		"UnitMatrix", &LuaMatrixImpl::UnitMatrix,
+		"UnitPieceMatrix", &LuaMatrixImpl::UnitPieceMatrix,
 
-		"LoadUnitPiece", &LuaMatrixImpl::LoadUnitPiece,
-		"MultUnitPiece", &LuaMatrixImpl::MultUnitPiece,
+		"FeatureMatrix", &LuaMatrixImpl::FeatureMatrix,
+		"FeaturePieceMatrix", &LuaMatrixImpl::FeaturePieceMatrix,
 
-		"LoadFeature", &LuaMatrixImpl::LoadFeature,
-		"MultFeature", &LuaMatrixImpl::MultFeature,
+		"ScreenViewMatrix", &LuaMatrixImpl::ScreenViewMatrix,
+		"ScreenProjMatrix", &LuaMatrixImpl::ScreenProjMatrix,
 
-		"LoadFeaturePiece", &LuaMatrixImpl::LoadFeaturePiece,
-		"MultFeaturePiece", &LuaMatrixImpl::MultFeaturePiece,
+		"Ortho", &LuaMatrixImpl::Ortho,
+		"Frustum", &LuaMatrixImpl::Frustum,
+		"Billboard", &LuaMatrixImpl::Billboard,
 
-		"ScreenViewMatrix", & LuaMatrixImpl::ScreenViewMatrix,
-		"ScreenProjMatrix", & LuaMatrixImpl::ScreenProjMatrix,
+		"GetAsScalar", &LuaMatrixImpl::GetAsScalar,
+		"GetAsTable", &LuaMatrixImpl::GetAsTable,
 
-		"LoadOrtho", & LuaMatrixImpl::LoadOrtho,
-		"MultOrtho", & LuaMatrixImpl::MultOrtho,
+		sol::meta_function::multiplication, sol::overload(
+			sol::resolve< LuaMatrixImpl (const LuaMatrixImpl&) const >(&LuaMatrixImpl::operator*),
+			sol::resolve< sol::as_table_t<std::vector<float>> (const sol::table&) const >(&LuaMatrixImpl::operator*)
+		),
 
-		"LoadFrustum", & LuaMatrixImpl::LoadFrustum,
-		"MultFrustum", & LuaMatrixImpl::MultFrustum,
-
-		"LoadBillboard", & LuaMatrixImpl::LoadBillboard,
-		"MultBillboard", & LuaMatrixImpl::MultBillboard,
-
-		"GetAsScalar", & LuaMatrixImpl::GetAsScalar,
-		"GetAsTable", & LuaMatrixImpl::GetAsTable
+		sol::meta_function::addition, &LuaMatrixImpl::operator+
 	);
 
 	gl.set("Matrix", sol::lua_nil); //because :)

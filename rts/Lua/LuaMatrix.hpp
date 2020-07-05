@@ -18,19 +18,22 @@
 #include "System/EventClient.h"
 #include "System/float4.h"
 
+#include "Sim/Features/Feature.h"
+#include "Sim/Units/Unit.h"
 
 #undef near
 #undef far
 
 struct lua_State;
 
-struct CFeature;
+
 struct CSolidObject;
-struct CUnit;
 
 struct LocalModelPiece;
 
 typedef std::tuple< float, float, float, float, float, float, float, float, float, float, float, float, float, float, float, float > tuple16f;
+typedef std::tuple< float, float, float > tuple3f;
+typedef std::tuple< float, float, float, float > tuple4f;
 
 class LuaMatrixEventsListeners : public CEventClient {
 public:
@@ -40,6 +43,9 @@ public:
 
 	bool GetViewResized() const {
 		return viewResized;
+	}
+	void ResetViewResized() {
+		viewResized = false;
 	}
 public:
 	bool WantsEvent(const std::string& eventName) override {
@@ -55,27 +61,25 @@ private:
 class LuaMatrixImpl {
 public:
 	LuaMatrixImpl() = default; //matrices should default to identity
-	LuaMatrixImpl(
-		const float m0, const float m1, const float m2, const float m3,
-		const float m4, const float m5, const float m6, const float m7,
-		const float m8, const float m9, const float m10, const float m11,
-		const float m12, const float m13, const float m14, const float m15);
-
-
 	LuaMatrixImpl(CMatrix44f mm) { mat = mm; }
 
-	LuaMatrixImpl(const LuaMatrixImpl& lva) = default;
-	LuaMatrixImpl(LuaMatrixImpl&& lva) = default; //move cons
+	LuaMatrixImpl(const LuaMatrixImpl& lmi) :
+		mat(lmi.mat)
+	{};
 
-	~LuaMatrixImpl() = default;
+	//LuaMatrixImpl(LuaMatrixImpl&& lva) = default; //move cons
+	//~LuaMatrixImpl() = default;
 public:
 	void Zero();
 	void Identity() { mat = CMatrix44f::Identity(); };
 
+	LuaMatrixImpl DeepCopy() { return LuaMatrixImpl(*this); };
+	void DeepCopyFrom(const LuaMatrixImpl& lmi) { *this = LuaMatrixImpl(lmi); };
+/*
 	void MultMat4(const LuaMatrixImpl& mat2) { mat *= mat2.GetMatRef(); }
 	void MultVec4(const float x, const float y, const float z, const float w) { mat.Mul(float4{ x, y, z, w }); }
 	void MultVec3(const float x, const float y, const float z) { MultVec4( x, y, z, 1.0f); }
-
+*/
 	void InverseAffine() { mat.InvertAffineInPlace(); };
 	void Inverse() { mat.InvertInPlace(); };
 
@@ -95,29 +99,18 @@ public:
 	void RotateDegY(const float deg) { RotateRad(deg * math::DEG_TO_RAD, 0.0f, 1.0f, 0.0f); };
 	void RotateDegZ(const float deg) { RotateRad(deg * math::DEG_TO_RAD, 0.0f, 0.0f, 1.0f); };
 
-	bool LoadUnit(const unsigned int unitID, sol::this_state L);
-	bool MultUnit(const unsigned int unitID, sol::this_state L);
+	bool UnitMatrix(const unsigned int unitID, const sol::optional<bool> mult, sol::this_state L) { return ObjectMatImpl<CUnit>(unitID, mult.value_or(true), L); }
+	bool UnitPieceMatrix(const unsigned int unitID, const unsigned int pieceNum, const sol::optional<bool> mult, sol::this_state L) { return ObjectPieceMatImpl<CUnit>(unitID, pieceNum, mult.value_or(true), L); }
 
-	bool LoadUnitPiece(const unsigned int unitID, const unsigned int pieceNum, sol::this_state L);
-	bool MultUnitPiece(const unsigned int unitID, const unsigned int pieceNum, sol::this_state L);
-
-	bool LoadFeature(const unsigned int featureID, sol::this_state L);
-	bool MultFeature(const unsigned int featureID, sol::this_state L);
-
-	bool LoadFeaturePiece(const unsigned int featureID, const unsigned int pieceNum, sol::this_state L);
-	bool MultFeaturePiece(const unsigned int featureID, const unsigned int pieceNum, sol::this_state L);
+	bool FeatureMatrix(const unsigned int featureID, const sol::optional<bool> mult, sol::this_state L) { return ObjectMatImpl<CFeature>(featureID, mult.value_or(true), L); }
+	bool FeaturePieceMatrix(const unsigned int featureID, const unsigned int pieceNum, const sol::optional<bool> mult, sol::this_state L) { return ObjectPieceMatImpl<CFeature>(featureID, pieceNum, mult.value_or(true), L); }
 
 	void ScreenViewMatrix();
 	void ScreenProjMatrix();
 
-	void LoadOrtho(const float left, const float right, const float bottom, const float top, const float near, const float far);
-	void MultOrtho(const float left, const float right, const float bottom, const float top, const float near, const float far);
-
-	void LoadFrustum(const float left, const float right, const float bottom, const float top, const float near, const float far);
-	void MultFrustum(const float left, const float right, const float bottom, const float top, const float near, const float far);
-
-	void LoadBillboard(const std::optional<unsigned int> cameraIdOpt);
-	void MultBillboard(const std::optional<unsigned int> cameraIdOpt);
+	void Ortho(const float left, const float right, const float bottom, const float top, const float near, const float far, const sol::optional<bool> mult);
+	void Frustum(const float left, const float right, const float bottom, const float top, const float near, const float far, const sol::optional<bool> mult);
+	void Billboard(const sol::optional<unsigned int> cameraIdOpt, const sol::optional<bool> mult);
 
 	tuple16f GetAsScalar()
 	{
@@ -142,27 +135,39 @@ public:
 public:
 	const CMatrix44f& GetMatRef() const { return mat; }
 public:
-	LuaMatrixImpl operator * (const LuaMatrixImpl& lmi) const { return LuaMatrixImpl(mat * lmi.GetMatRef()); };
-	LuaMatrixImpl operator + (const LuaMatrixImpl& lmi) const { return LuaMatrixImpl(mat + lmi.GetMatRef()); };
+	sol::as_table_t<std::vector<float>> operator* (const sol::table& tbl) const {
+		float4 f4 { 0.0f, 0.0f, 0.0f, 1.0f };
+		for (auto i = 1; i <= 4; ++i) {
+			const sol::optional<float> maybeValue = tbl[i];
+			if (!maybeValue)
+				continue;
+
+			f4[i - 1] = maybeValue.value();
+		}
+		f4 = mat * f4;
+		return sol::as_table( std::vector<float> { f4.x, f4.y, f4.z, f4.w } );
+	};
+	LuaMatrixImpl operator* (const LuaMatrixImpl& lmi) const { return LuaMatrixImpl(mat * lmi.GetMatRef()); };
+
+	LuaMatrixImpl operator+ (const LuaMatrixImpl& lmi) const { return LuaMatrixImpl(mat + lmi.GetMatRef()); };
 private:
+	template<typename TFunc>
+	inline void AssignOrMultMatImpl(const sol::optional<bool> mult, const bool multDefault, const TFunc& tfunc);
+
 	template<typename TObj>
 	inline const TObj* GetObjectImpl(const unsigned int objID, sol::this_state L);
 
 	template<typename TObj>
 	inline bool GetObjectMatImpl(const unsigned int objID, CMatrix44f& outMat, sol::this_state L);
 	template <typename  TObj>
-	bool LoadObjectMatImpl(const unsigned int objID, sol::this_state L);
-	template <typename  TObj>
-	bool MultObjectMatImpl(const unsigned int objID, sol::this_state L);
+	bool ObjectMatImpl(const unsigned int objID, bool mult, sol::this_state L);
 
 	template <typename  TObj>
 	bool GetObjectPieceMatImpl(const unsigned int objID, const unsigned int pieceNum, CMatrix44f& outMat, sol::this_state L);
 	template <typename  TObj>
-	bool LoadObjectPieceMatImpl(const unsigned int objID, const unsigned int pieceNum, sol::this_state L);
-	template <typename  TObj>
-	bool MultObjectPieceMatImpl(const unsigned int objID, const unsigned int pieceNum, sol::this_state L);
+	bool ObjectPieceMatImpl(const unsigned int objID, const unsigned int pieceNum, bool mult, sol::this_state L);
 
-	void CondSetupScreenMatrices();
+	static void CondSetupScreenMatrices();
 private:
 	inline static bool IsFeatureVisible(const CFeature* feature, sol::this_state L);
 	inline static bool IsUnitVisible(const CUnit* feature, sol::this_state L);
@@ -171,14 +176,15 @@ private:
 	inline static const LocalModelPiece* ParseObjectConstLocalModelPiece(const CSolidObject* obj, const unsigned int pieceNum);
 	//static methods
 private:
+	static constexpr bool viewProjMultDefault = true;
 	//static constants
 private:
 	static LuaMatrixEventsListeners lmel;
 private:
 	CMatrix44f mat;
-
-	CMatrix44f screenViewMatrix;
-	CMatrix44f screenProjMatrix;
+private:
+	static CMatrix44f screenViewMatrix;
+	static CMatrix44f screenProjMatrix;
 	//private vars
 };
 
