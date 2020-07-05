@@ -35,29 +35,6 @@ typedef std::tuple< float, float, float, float, float, float, float, float, floa
 typedef std::tuple< float, float, float > tuple3f;
 typedef std::tuple< float, float, float, float > tuple4f;
 
-class LuaMatrixEventsListeners : public CEventClient {
-public:
-	LuaMatrixEventsListeners()
-		: CEventClient("[LuaMatrixEventsListeners]", 42, false)
-		, viewResized(true) {};
-
-	bool GetViewResized() const {
-		return viewResized;
-	}
-	void ResetViewResized() {
-		viewResized = false;
-	}
-public:
-	bool WantsEvent(const std::string& eventName) override {
-		return (eventName == "ViewResize");
-	}
-	void ViewResize() override {
-		viewResized = true;
-	}
-private:
-	bool viewResized;
-};
-
 class LuaMatrixImpl {
 public:
 	LuaMatrixImpl() = default; //matrices should default to identity
@@ -177,10 +154,8 @@ private:
 	inline static const LocalModelPiece* ParseObjectConstLocalModelPiece(const CSolidObject* obj, const unsigned int pieceNum);
 	//static methods
 private:
-	static constexpr bool viewProjMultDefault = true;
+	static constexpr bool viewProjMultDefault = false;
 	//static constants
-private:
-	static LuaMatrixEventsListeners lmel;
 private:
 	CMatrix44f mat;
 private:

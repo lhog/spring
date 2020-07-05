@@ -19,8 +19,6 @@
 #undef near
 #undef far
 
-LuaMatrixEventsListeners LuaMatrixImpl::lmel = LuaMatrixEventsListeners{};
-
 CMatrix44f LuaMatrixImpl::screenViewMatrix = CMatrix44f{};
 CMatrix44f LuaMatrixImpl::screenProjMatrix = CMatrix44f{};
 
@@ -204,10 +202,6 @@ inline bool LuaMatrixImpl::ObjectPieceMatImpl(const unsigned int objID, const un
 }
 
 inline void LuaMatrixImpl::CondSetupScreenMatrices() {
-
-	if (!lmel.GetViewResized()) //already up-to-date
-		return;
-
 	// .x := screen width (meters), .y := eye-to-screen (meters)
 	static float2 screenParameters = { 0.36f, 0.60f };
 
@@ -236,8 +230,6 @@ inline void LuaMatrixImpl::CondSetupScreenMatrices() {
 	// translate s.t. (0,0,0) is on the zplane, on the window's bottom-left corner
 	LuaMatrixImpl::screenViewMatrix = CMatrix44f{ float3{left / zfact, bottom / zfact, -zplane} };
 	LuaMatrixImpl::screenProjMatrix = CMatrix44f::ClipControl(globalRendering->supportClipSpaceControl) * CMatrix44f::PerspProj(left, right, bottom, top, znear, zfar);
-
-	lmel.ResetViewResized();
 }
 
 void LuaMatrixImpl::ScreenViewMatrix()
