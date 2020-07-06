@@ -32,6 +32,7 @@ struct CSolidObject;
 struct LocalModelPiece;
 
 typedef std::tuple< float, float, float, float, float, float, float, float, float, float, float, float, float, float, float, float > tuple16f;
+typedef std::tuple< float, float > tuple2f;
 typedef std::tuple< float, float, float > tuple3f;
 typedef std::tuple< float, float, float, float > tuple4f;
 
@@ -50,13 +51,27 @@ public:
 	void Zero();
 	void Identity() { mat = CMatrix44f::Identity(); };
 
-	LuaMatrixImpl DeepCopy() { return LuaMatrixImpl(*this); };
-	void DeepCopyFrom(const LuaMatrixImpl& lmi) { *this = LuaMatrixImpl(lmi); };
-/*
-	void MultMat4(const LuaMatrixImpl& mat2) { mat *= mat2.GetMatRef(); }
-	void MultVec4(const float x, const float y, const float z, const float w) { mat.Mul(float4{ x, y, z, w }); }
-	void MultVec3(const float x, const float y, const float z) { MultVec4( x, y, z, 1.0f); }
-*/
+	void SetMatrixElements(
+		const float m0, const float m1, const float m2, const float m3,
+		const float m4, const float m5, const float m6, const float m7,
+		const float m8, const float m9, const float m10, const float m11,
+		const float m12, const float m13, const float m14, const float m15);
+
+	LuaMatrixImpl DeepCopy() { return LuaMatrixImpl(*this); }
+
+	/*
+	tuple2f Mult(const float x, const float y) { Mult(x, y, 0.0f, 1.0f); }
+	tuple3f Mult(const float x, const float y, const float z) { Mult(x, y, z, 1.0f); }
+	tuple4f Mult(const float x, const float y, const float z, const float w)
+	{
+		float4 res = mat.Mul(float4{ x, y, z, w });
+		return std::make_tuple(res.x, res.y, res.z, res.w);
+	}
+	LuaMatrixImpl Mult(const LuaMatrixImpl& mat2) { return mat * mat2.GetMatRef(); }
+
+	LuaMatrixImpl Add(const LuaMatrixImpl& mat2) { return mat + mat2.GetMatRef(); }
+	*/
+
 	void InverseAffine() { mat.InvertAffineInPlace(); };
 	void Inverse() { mat.InvertInPlace(); };
 
@@ -64,6 +79,7 @@ public:
 
 	void Translate(const float x, const float y, const float z);
 	void Scale(const float x, const float y, const float z);
+	void Scale(const float s);
 
 	void RotateRad(const float rad, const float x, const float y, const float z);
 	void RotateDeg(const float deg, const float x, const float y, const float z) { RotateRad(deg * math::DEG_TO_RAD, x, y, z); };
@@ -82,8 +98,8 @@ public:
 	bool FeatureMatrix(const unsigned int featureID, const sol::optional<bool> mult, sol::this_state L) { return ObjectMatImpl<CFeature>(featureID, mult.value_or(true), L); }
 	bool FeaturePieceMatrix(const unsigned int featureID, const unsigned int pieceNum, const sol::optional<bool> mult, sol::this_state L) { return ObjectPieceMatImpl<CFeature>(featureID, pieceNum, mult.value_or(true), L); }
 
-	void ScreenViewMatrix();
-	void ScreenProjMatrix();
+	void ScreenViewMatrix(const sol::optional<bool> mult);
+	void ScreenProjMatrix(const sol::optional<bool> mult);
 
 	void Ortho(const float left, const float right, const float bottom, const float top, const float near, const float far, const sol::optional<bool> mult);
 	void Frustum(const float left, const float right, const float bottom, const float top, const float near, const float far, const sol::optional<bool> mult);

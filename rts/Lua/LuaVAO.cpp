@@ -69,14 +69,15 @@ inline T LuaVAOImpl::MaybeFunc(const sol::table& tbl, const std::string& key, T 
 *		[0] = {type = GL.FLOAT, ...}
 * }
 */
-void LuaVAOImpl::FillAttribTables(const sol::table& attrDefTable, const int divisor, int* attribsSizeInBytes)
+bool LuaVAOImpl::FillAttribsTableImpl(const sol::table& attrDefTable, const int divisor)
 {
+	bool atLeastOne = false;
 	for (const auto& kv : attrDefTable) {
 		const sol::object& key = kv.first;
 		const sol::object& value = kv.second;
 
 		if (numAttributes >= LuaVAOImpl::glMaxNumOfAttributes)
-			return;
+			return false;
 
 		if (!key.is<int>() || value.get_type() != sol::type::table) //key should be int, value should be table i.e. [1] = {}
 			continue;
@@ -96,21 +97,21 @@ void LuaVAOImpl::FillAttribTables(const sol::table& attrDefTable, const int divi
 		int typeSizeInBytes = 0;
 
 		switch (type) {
-			case GL_BYTE:
-			case GL_UNSIGNED_BYTE:
-				typeSizeInBytes = sizeof(uint8_t);
-				break;
-			case GL_SHORT:
-			case GL_UNSIGNED_SHORT:
-				typeSizeInBytes = sizeof(uint16_t);
-				break;
-			case GL_INT:
-			case GL_UNSIGNED_INT:
-				typeSizeInBytes = sizeof(uint32_t);
-				break;
-			case GL_FLOAT:
-				typeSizeInBytes = sizeof(GLfloat);
-				break;
+		case GL_BYTE:
+		case GL_UNSIGNED_BYTE:
+			typeSizeInBytes = sizeof(uint8_t);
+			break;
+		case GL_SHORT:
+		case GL_UNSIGNED_SHORT:
+			typeSizeInBytes = sizeof(uint16_t);
+			break;
+		case GL_INT:
+		case GL_UNSIGNED_INT:
+			typeSizeInBytes = sizeof(uint32_t);
+			break;
+		case GL_FLOAT:
+			typeSizeInBytes = sizeof(GLfloat);
+			break;
 		}
 
 		if (typeSizeInBytes == 0)
@@ -127,8 +128,63 @@ void LuaVAOImpl::FillAttribTables(const sol::table& attrDefTable, const int divi
 			typeSizeInBytes,
 			name
 		};
-
+		atLeastOne = true;
 		++numAttributes;
+	}
+
+	return atLeastOne;
+}
+
+bool LuaVAOImpl::FillAttribsNumberImpl(const int numFloatAttribs, const int divisor)
+{
+	if (numFloatAttribs <= 0)
+		return false;
+
+	if (numFloatAttribs % 4 != 0)
+		return false;
+
+	bool atLeastOne = false;
+
+	constexpr GLenum type = GL_FLOAT;
+	constexpr GLboolean normalized = GL_FALSE;
+	constexpr GLint size = 4;
+	constexpr int typeSizeInBytes = sizeof(GLfloat);
+
+	for (int attrID = 0; attrID < std::ceil(numFloatAttribs / 4.0f); ++attrID) {
+
+		const std::string name = fmt::format("attr{}", attrID);
+
+		vaoAttribs[attrID] = {
+			divisor,
+			size,
+			type,
+			normalized,
+			0, // stride , will be filled up later
+			0, // pointer, will be filled up later
+			//AUX
+			typeSizeInBytes,
+			name
+		};
+		atLeastOne = true;
+		++numAttributes;
+	}
+
+	return atLeastOne;
+}
+
+void LuaVAOImpl::FillAttribsImpl(const sol::object& attrDefObject, const int divisor, int* attribsSizeInBytes)
+{
+	switch (attrDefObject.get_type()) {
+	case sol::type::table:
+		if (!FillAttribsTableImpl(attrDefObject.as<const sol::table&>(), divisor))
+			return;
+		break;
+	case sol::type::number:
+		if (!attrDefObject.is<int>() || (!FillAttribsNumberImpl(attrDefObject.as<const int>(), divisor)))
+			return;
+		break;
+	default:
+		return;
 	}
 
 	*attribsSizeInBytes = 0;
@@ -142,13 +198,10 @@ void LuaVAOImpl::FillAttribTables(const sol::table& attrDefTable, const int divi
 		const auto vaIndex = kv.first;
 		const auto& attr = kv.second;
 
-		//LOG("numAttributes=%d,type=%d,normalized=%d,size=%d,name=%s,typeSizeInBytes=%d", numAttributes, attr.type, attr.normalized, attr.size, attr.name.c_str(), attr.typeSizeInBytes);
-
 		const GLsizei attribSizeInBytes = attr.size * attr.typeSizeInBytes;
 		*attribsSizeInBytes += attribSizeInBytes;
 
 		vaoAttribs[vaIndex].pointer = pointer;
-		//LOG("numAttributes=%d,attribSizeInBytes=%d,attribsSizeInBytes=%d,pointer=%d", numAttributes, attribSizeInBytes, *attribsSizeInBytes, attr.pointer);
 
 		pointer += attribSizeInBytes; //the pointer points to the next attrib
 	}
@@ -159,11 +212,15 @@ void LuaVAOImpl::FillAttribTables(const sol::table& attrDefTable, const int divi
 			continue;
 
 		kv.second.stride = *attribsSizeInBytes;
-		//LOG("kv.first=%d,kv.second.stride=%d", kv.first, kv.second.stride);
+
+#if 0
+		LOG("Attribute name = %s, divisor = %d, size = %d, type = %d, normalized = %d, stride = %d, pointer = %d, typeSizeInBytes = %d", kv.second.name.c_str(), kv.second.divisor, kv.second.size, kv.second.type, kv.second.normalized, kv.second.stride, kv.second.pointer, kv.second.typeSizeInBytes);
+#endif
+
 	}
 }
 
-int LuaVAOImpl::SetVertexAttributes(const int maxVertCount, const sol::table& attrDefTable)
+int LuaVAOImpl::SetVertexAttributes(const int maxVertCount, const sol::object& attrDefObject)
 {
 	if (vboVert)
 		return 0;
@@ -173,7 +230,7 @@ int LuaVAOImpl::SetVertexAttributes(const int maxVertCount, const sol::table& at
 
 	this->maxVertCount = maxVertCount;
 
-	FillAttribTables(attrDefTable, 0/*per vertex divisor*/, &this->vertAttribsSizeInBytes);
+	FillAttribsImpl(attrDefObject, 0/*per vertex divisor*/, &this->vertAttribsSizeInBytes);
 
 	if (this->vertAttribsSizeInBytes <= 0)
 		return 0;
@@ -186,7 +243,7 @@ int LuaVAOImpl::SetVertexAttributes(const int maxVertCount, const sol::table& at
 	return numAttributes;
 }
 
-int LuaVAOImpl::SetInstanceAttributes(const int maxInstCount, const sol::table& attrDefTable)
+int LuaVAOImpl::SetInstanceAttributes(const int maxInstCount, const sol::object& attrDefObject)
 {
 	if (vboInst)
 		return 0;
@@ -196,7 +253,7 @@ int LuaVAOImpl::SetInstanceAttributes(const int maxInstCount, const sol::table& 
 
 	this->maxInstCount = maxInstCount;
 
-	FillAttribTables(attrDefTable, 1/*per instance divisor*/, &this->instAttribsSizeInBytes);
+	FillAttribsImpl(attrDefObject, 1/*per instance divisor*/, &this->instAttribsSizeInBytes);
 
 	if (this->instAttribsSizeInBytes <= 0)
 		return 0;

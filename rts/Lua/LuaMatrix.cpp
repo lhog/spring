@@ -36,6 +36,16 @@ void LuaMatrixImpl::Zero()
 #endif
 }
 
+void LuaMatrixImpl::SetMatrixElements(const float m0, const float m1, const float m2, const float m3, const float m4, const float m5, const float m6, const float m7, const float m8, const float m9, const float m10, const float m11, const float m12, const float m13, const float m14, const float m15)
+{
+#define MAT_EQ_M(i) mat[i] = m##i
+	MAT_EQ_M(0); MAT_EQ_M(1); MAT_EQ_M(2); MAT_EQ_M(3);
+	MAT_EQ_M(4); MAT_EQ_M(5); MAT_EQ_M(6); MAT_EQ_M(7);
+	MAT_EQ_M(8); MAT_EQ_M(9); MAT_EQ_M(10); MAT_EQ_M(11);
+	MAT_EQ_M(12); MAT_EQ_M(13); MAT_EQ_M(14); MAT_EQ_M(15);
+#undef MAT_EQ_M
+}
+
 void LuaMatrixImpl::Translate(const float x, const float y, const float z)
 {
 	mat.Translate({ x, y, z });
@@ -44,6 +54,11 @@ void LuaMatrixImpl::Translate(const float x, const float y, const float z)
 void LuaMatrixImpl::Scale(const float x, const float y, const float z)
 {
 	mat.Scale({ x, y, z });
+}
+
+void LuaMatrixImpl::Scale(const float s)
+{
+	mat.Scale({ s, s, s });
 }
 
 void LuaMatrixImpl::RotateRad(const float rad, const float x, const float y, const float z)
@@ -232,16 +247,18 @@ inline void LuaMatrixImpl::CondSetupScreenMatrices() {
 	LuaMatrixImpl::screenProjMatrix = CMatrix44f::ClipControl(globalRendering->supportClipSpaceControl) * CMatrix44f::PerspProj(left, right, bottom, top, znear, zfar);
 }
 
-void LuaMatrixImpl::ScreenViewMatrix()
+void LuaMatrixImpl::ScreenViewMatrix(const sol::optional<bool> mult)
 {
 	CondSetupScreenMatrices();
-	mat = screenViewMatrix;
+	const auto lambda = [=]() { return screenViewMatrix; };
+	AssignOrMultMatImpl(mult, LuaMatrixImpl::viewProjMultDefault, lambda);
 }
 
-void LuaMatrixImpl::ScreenProjMatrix()
+void LuaMatrixImpl::ScreenProjMatrix(const sol::optional<bool> mult)
 {
 	CondSetupScreenMatrices();
-	mat = screenProjMatrix;
+	const auto lambda = [=]() { return screenProjMatrix; };
+	AssignOrMultMatImpl(mult, LuaMatrixImpl::viewProjMultDefault, lambda);
 }
 
 void LuaMatrixImpl::Ortho(const float left, const float right, const float bottom, const float top, const float near, const float far, const sol::optional<bool> mult)
@@ -285,8 +302,9 @@ bool LuaMatrix::PostPushEntries(lua_State* L)
 		"Identity", &LuaMatrixImpl::Identity,
 		"LoadIdentity", &LuaMatrixImpl::Identity,
 
+		"SetMatrixElements", &LuaMatrixImpl::SetMatrixElements,
+
 		"DeepCopy", &LuaMatrixImpl::DeepCopy,
-		"DeepCopyFrom", & LuaMatrixImpl::DeepCopyFrom,
 
 		//"Mult", sol::overload(&LuaMatrixImpl::MultMat4, &LuaMatrixImpl::MultVec4, LuaMatrixImpl::MultVec3),
 
@@ -298,7 +316,9 @@ bool LuaMatrix::PostPushEntries(lua_State* L)
 		"Transpose", &LuaMatrixImpl::Transpose,
 
 		"Translate", &LuaMatrixImpl::Translate,
-		"Scale", &LuaMatrixImpl::Scale,
+		"Scale", sol::overload(
+			sol::resolve<void(const float, const float, const float)>(&LuaMatrixImpl::Scale),
+			sol::resolve<void(const float)>(&LuaMatrixImpl::Scale)),
 
 		"RotateRad", &LuaMatrixImpl::RotateRad,
 		"RotateDeg", &LuaMatrixImpl::RotateDeg,

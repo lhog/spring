@@ -38,8 +38,8 @@ public:
 
 	~LuaVAOImpl();
 public:
-	int SetVertexAttributes(const int maxVertCount, const sol::table& attrDefTable);
-	int SetInstanceAttributes(const int maxInstCount, const sol::table& attrDefTable);
+	int SetVertexAttributes(const int maxVertCount, const sol::object& attrDefObject);
+	int SetInstanceAttributes(const int maxInstCount, const sol::object& attrDefObject);
 	bool SetIndexAttributes(const int maxIndxCount, const sol::optional<GLenum> indTypeOpt);
 
 	int UploadVertexBulk(const sol::table& bulkData, const sol::optional<int> vertexOffsetOpt);
@@ -57,7 +57,10 @@ private:
 	bool CondInitVAO();
 	bool SetIndexAttributesImpl(const int maxIndxCount, const GLenum indType);
 	int UploadImpl(const sol::table& luaTblData, const sol::optional<int> offsetOpt, const int divisor, const int* attrNum, const int aSizeInBytes, VBO* vbo);
-	void FillAttribTables(const sol::table& attrDefTable, const int divisor, int* attribsSizeInBytes);
+
+	bool FillAttribsTableImpl(const sol::table& attrDefTable, const int divisor);
+	bool FillAttribsNumberImpl(const int numFloatAttribs, const int divisor);
+	void FillAttribsImpl(const sol::object& attrDefTable, const int divisor, int* attribsSizeInBytes);
 private:
 	template <typename  TIn, typename  TOut>
 	static TOut TransformFunc(const TIn input);
