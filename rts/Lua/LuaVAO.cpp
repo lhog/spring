@@ -141,6 +141,7 @@ bool LuaVAOImpl::FillAttribsNumberImpl(const int numFloatAttribs, const int divi
 		return false;
 
 	if (numFloatAttribs % 4 != 0)
+		//throw std::runtime_error("FillAttribsNumberImpl failure");
 		return false;
 
 	bool atLeastOne = false;
@@ -672,10 +673,12 @@ bool LuaVAOImpl::DrawElements(const GLenum mode, const sol::optional<GLsizei> in
 
 ///////////////////////////////////////////////////////////
 
-bool LuaVAO::PostPushEntries(lua_State* L)
+bool LuaVAO::PushEntries(lua_State* L)
 {
+	REGISTER_LUA_CFUNC(GetVAO);
+
 	sol::state_view lua(L);
-	auto gl = lua.get<sol::table>("gl");
+	auto gl = sol::stack::get<sol::table>(L, -1);
 
 	gl.new_usertype<LuaVAOImpl>("VAO",
 		sol::constructors<LuaVAOImpl(const sol::optional<bool>)>(),
@@ -693,17 +696,9 @@ bool LuaVAO::PostPushEntries(lua_State* L)
 
 		"DrawArrays", &LuaVAOImpl::DrawArrays,
 		"DrawElements", &LuaVAOImpl::DrawElements
-	);
+		);
 
 	gl.set("VAO", sol::lua_nil); //because :)
-
-	return true;
-}
-
-
-bool LuaVAO::PushEntries(lua_State* L)
-{
-	REGISTER_LUA_CFUNC(GetVAO);
 
 	return true;
 }

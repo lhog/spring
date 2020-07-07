@@ -96,7 +96,6 @@ private:
 class LuaVAO {
 public:
 	static int GetVAO(lua_State* L);
-	static bool PostPushEntries(lua_State* L);
 	static bool PushEntries(lua_State* L);
 };
 

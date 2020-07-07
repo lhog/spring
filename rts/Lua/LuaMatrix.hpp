@@ -183,7 +183,6 @@ private:
 class LuaMatrix {
 public:
 	static int GetMatrix(lua_State* L);
-	static bool PostPushEntries(lua_State* L);
 	static bool PushEntries(lua_State* L);
 };
 

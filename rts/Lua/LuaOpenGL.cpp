@@ -445,14 +445,6 @@ bool LuaOpenGL::PushEntries(lua_State* L)
 	return true;
 }
 
-bool LuaOpenGL::PostPushEntries(lua_State* L)
-{
-	return
-		LuaVAO::PostPushEntries(L) &&
-		LuaMatrix::PostPushEntries(L);
-}
-
-
 /******************************************************************************/
 /******************************************************************************/
 

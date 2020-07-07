@@ -287,10 +287,12 @@ void LuaMatrixImpl::Billboard(const sol::optional<unsigned int> cameraIdOpt, con
 
 ///////////////////////////////////////////////////////////
 
-bool LuaMatrix::PostPushEntries(lua_State* L)
+bool LuaMatrix::PushEntries(lua_State* L)
 {
+	REGISTER_LUA_CFUNC(GetMatrix);
+
 	sol::state_view lua(L);
-	auto gl = lua.get<sol::table>("gl");
+	auto gl = sol::stack::get<sol::table>(L, -1);
 
 	gl.new_usertype<LuaMatrixImpl>("LuaMatrixImpl",
 
@@ -348,21 +350,14 @@ bool LuaMatrix::PostPushEntries(lua_State* L)
 		"GetAsTable", &LuaMatrixImpl::GetAsTable,
 
 		sol::meta_function::multiplication, sol::overload(
-			sol::resolve< LuaMatrixImpl (const LuaMatrixImpl&) const >(&LuaMatrixImpl::operator*),
-			sol::resolve< sol::as_table_t<std::vector<float>> (const sol::table&) const >(&LuaMatrixImpl::operator*)
+			sol::resolve< LuaMatrixImpl(const LuaMatrixImpl&) const >(&LuaMatrixImpl::operator*),
+			sol::resolve< sol::as_table_t<std::vector<float>>(const sol::table&) const >(&LuaMatrixImpl::operator*)
 		),
 
 		sol::meta_function::addition, &LuaMatrixImpl::operator+
-	);
+		);
 
 	gl.set("Matrix", sol::lua_nil); //because :)
-
-	return true;
-}
-
-bool LuaMatrix::PushEntries(lua_State* L)
-{
-	REGISTER_LUA_CFUNC(GetMatrix);
 
 	return true;
 }

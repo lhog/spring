@@ -165,12 +165,6 @@ CLuaUI::CLuaUI()
 	}
 
 	lua_settop(L, 0);
-
-	if (!LuaOpenGL::PostPushEntries(L)) {
-		KillLua();
-		return;
-	}
-
 	if (!LoadCode(L, code, file)) {
 		KillLua();
 		return;

@@ -33,8 +33,6 @@ class LuaOpenGL {
 		static void Init();
 		static void Free();
 
-		static bool PostPushEntries(lua_State* L);
-
 		static bool PushEntries(lua_State* L);
 
 		static bool IsDrawingEnabled(lua_State* L) { return GetLuaContextData(L)->drawingEnabled; }
