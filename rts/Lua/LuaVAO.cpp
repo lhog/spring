@@ -627,7 +627,7 @@ bool LuaVAOImpl::DrawArrays(const GLenum mode, const sol::optional<GLsizei> vert
 	return true;
 }
 
-bool LuaVAOImpl::DrawElements(const GLenum mode, const sol::optional<GLsizei> indCountOpt, const sol::optional<int> indElemOffsetOpt, const sol::optional<int> instanceCountOpt)
+bool LuaVAOImpl::DrawElements(const GLenum mode, const sol::optional<GLsizei> indCountOpt, const sol::optional<int> indElemOffsetOpt, const sol::optional<int> instanceCountOpt, const sol::optional<int> baseVertexOpt)
 {
 	const auto indCount = std::max(indCountOpt.value_or(maxIndxCount), 0);
 
@@ -645,16 +645,23 @@ bool LuaVAOImpl::DrawElements(const GLenum mode, const sol::optional<GLsizei> in
 
 	const auto indElemOffset = std::max(indElemOffsetOpt.value_or(0), 0);
 	const auto indElemOffsetInBytes = indElemOffset * indElemSizeInBytes;
-
+	const auto baseVertex = std::max(baseVertexOpt.value_or(0), 0);
 	const auto instanceCount = std::max(instanceCountOpt.value_or(0), 0); // 0 - forces ordinary version, while 1 - calls *Instanced()
 
 	vao->Bind();
 
 #define INT2PTR(x) ((void*)static_cast<intptr_t>(x))
-	if (instanceCount == 0)
-		glDrawElements(mode, indCount, this->indexType, INT2PTR(indElemOffsetInBytes));
-	else
-		glDrawElementsInstanced(mode, indCount, this->indexType, INT2PTR(indElemOffsetInBytes), instanceCount);
+	if (instanceCount == 0) {
+		if (baseVertex == 0)
+			glDrawElements(mode, indCount, this->indexType, INT2PTR(indElemOffsetInBytes));
+		else
+			glDrawElementsBaseVertex(mode, indCount, this->indexType, INT2PTR(indElemOffsetInBytes), baseVertex);
+	} else {
+		if (baseVertex == 0)
+			glDrawElementsInstanced(mode, indCount, this->indexType, INT2PTR(indElemOffsetInBytes), instanceCount);
+		else
+			glDrawElementsInstancedBaseVertex(mode, indCount, this->indexType, INT2PTR(indElemOffsetInBytes), instanceCount, baseVertex);
+	}
 #undef INT2PTR
 
 	vao->Unbind();
