@@ -7,6 +7,7 @@
 #include "System/type2.h"
 
 #include "Sim/Objects/SolidObject.h"
+#include "Sim/Projectiles/ProjectileHandler.h"
 #include "Sim/Features/FeatureHandler.h"
 #include "Sim/Units/UnitHandler.h"
 
@@ -68,56 +69,41 @@ void LuaMatrixImpl::RotateRad(const float rad, const float x, const float y, con
 
 ///////////////////////////////////////////////////////////
 
-inline bool LuaMatrixImpl::IsUnitVisible(const CUnit* unit, sol::this_state L)
-{
-	const int readAllyTeam = CLuaHandle::GetHandleReadAllyTeam(L);
-
-	if ((readAllyTeam < 0) && (readAllyTeam == CEventClient::NoAccessTeam))
-		return false;
-
-	if ((unit->losStatus[readAllyTeam] & LOS_INLOS) == 0)
-		return false;
-
-	return true;
-}
-
-inline bool LuaMatrixImpl::IsFeatureVisible(const CFeature* feature, sol::this_state L)
+template<typename TObj>
+inline bool LuaMatrixImpl::IsObjectVisible(const TObj* obj, sol::this_state L)
 {
 	if (CLuaHandle::GetHandleFullRead(L))
 		return true;
 
 	const int readAllyTeam = CLuaHandle::GetHandleReadAllyTeam(L);
 
-	if (readAllyTeam < 0)
-		return (readAllyTeam == CEventClient::AllAccessTeam);
+	if ((readAllyTeam < 0) && (readAllyTeam == CEventClient::NoAccessTeam))
+		return false;
 
-	return (feature->IsInLosForAllyTeam(readAllyTeam));
+	return (obj->IsInLosForAllyTeam(readAllyTeam));
 }
 
-inline CUnit* LuaMatrixImpl::ParseUnit(int unitID, sol::this_state L)
+template<typename TObj>
+inline const TObj* LuaMatrixImpl::ParseObject(int objID, sol::this_state L)
 {
-	CUnit* unit = unitHandler.GetUnit(unitID);
+	const TObj* obj = nullptr;
+	if constexpr(std::is_same<TObj, CUnit>::value) {
+		obj = unitHandler.GetUnit(objID);
+	}
+	else if constexpr(std::is_same<TObj, CUnit>::value) {
+		obj = featureHandler.GetFeature(objID);
+	}
+	else if constexpr(std::is_same<TObj, CUnit>::value) {
+		obj = projectileHandler.GetProjectileBySyncedID(objID);
+	}
 
-	if (unit == nullptr)
+	if (obj == nullptr)
 		return nullptr;
 
-	if (!IsUnitVisible(unit, L))
+	if (!IsObjectVisible(obj, L))
 		return nullptr;
 
-	return unit;
-}
-
-inline CFeature* LuaMatrixImpl::ParseFeature(int featureID, sol::this_state L)
-{
-	CFeature* feature = featureHandler.GetFeature(featureID);
-
-	if (feature == nullptr)
-		return nullptr;
-
-	if (!IsFeatureVisible(feature, L))
-		return nullptr;
-
-	return feature;
+	return obj;
 }
 
 inline const LocalModelPiece* LuaMatrixImpl::ParseObjectConstLocalModelPiece(const CSolidObject* obj, const unsigned int pieceNum)
@@ -143,23 +129,9 @@ inline void LuaMatrixImpl::AssignOrMultMatImpl(const sol::optional<bool> mult, c
 }
 
 template<typename TObj>
-inline const TObj* LuaMatrixImpl::GetObjectImpl(const unsigned int objID, sol::this_state L)
-{
-	const TObj* obj = nullptr;
-	if constexpr (std::is_same<TObj, CUnit>::value) {
-		obj = ParseUnit(objID, L);
-	}
-	else if constexpr (std::is_same<TObj, CUnit>::value) {
-		obj = ParseFeature(objID, L);
-	}
-
-	return obj;
-}
-
-template<typename TObj>
 inline bool LuaMatrixImpl::GetObjectMatImpl(const unsigned int objID, CMatrix44f& outMat, sol::this_state L)
 {
-	const TObj* obj = GetObjectImpl<TObj>(objID, L);
+	const TObj* obj = ParseObject<TObj>(objID, L);
 
 	if (!obj)
 		return false;
@@ -187,7 +159,7 @@ inline bool LuaMatrixImpl::ObjectMatImpl(const unsigned int objID, bool mult, so
 template<typename TObj>
 inline bool LuaMatrixImpl::GetObjectPieceMatImpl(const unsigned int objID, const unsigned int pieceNum, CMatrix44f& outMat, sol::this_state L)
 {
-	const TObj* obj = GetObjectImpl<TObj>(objID, L);
+	const TObj* obj = ParseObject<TObj>(objID, L);
 
 	if (!obj)
 		return false;
@@ -338,6 +310,9 @@ bool LuaMatrix::PushEntries(lua_State* L)
 
 		"FeatureMatrix", &LuaMatrixImpl::FeatureMatrix,
 		"FeaturePieceMatrix", &LuaMatrixImpl::FeaturePieceMatrix,
+
+		"ProjectileMatrix", & LuaMatrixImpl::ProjectileMatrix,
+		"ProjectilePieceMatrix", & LuaMatrixImpl::ProjectilePieceMatrix,
 
 		"ScreenViewMatrix", &LuaMatrixImpl::ScreenViewMatrix,
 		"ScreenProjMatrix", &LuaMatrixImpl::ScreenProjMatrix,

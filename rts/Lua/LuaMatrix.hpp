@@ -92,11 +92,14 @@ public:
 	void RotateDegY(const float deg) { RotateRad(deg * math::DEG_TO_RAD, 0.0f, 1.0f, 0.0f); };
 	void RotateDegZ(const float deg) { RotateRad(deg * math::DEG_TO_RAD, 0.0f, 0.0f, 1.0f); };
 
-	bool UnitMatrix(const unsigned int unitID, const sol::optional<bool> mult, sol::this_state L) { return ObjectMatImpl<CUnit>(unitID, mult.value_or(true), L); }
-	bool UnitPieceMatrix(const unsigned int unitID, const unsigned int pieceNum, const sol::optional<bool> mult, sol::this_state L) { return ObjectPieceMatImpl<CUnit>(unitID, pieceNum, mult.value_or(true), L); }
+	bool UnitMatrix(const unsigned int unitID, const sol::optional<bool> mult, sol::this_state L) { return ObjectMatImpl<CUnit>(unitID, mult.value_or(objectMultDefault), L); }
+	bool UnitPieceMatrix(const unsigned int unitID, const unsigned int pieceNum, const sol::optional<bool> mult, sol::this_state L) { return ObjectPieceMatImpl<CUnit>(unitID, pieceNum, mult.value_or(objectMultDefault), L); }
 
-	bool FeatureMatrix(const unsigned int featureID, const sol::optional<bool> mult, sol::this_state L) { return ObjectMatImpl<CFeature>(featureID, mult.value_or(true), L); }
-	bool FeaturePieceMatrix(const unsigned int featureID, const unsigned int pieceNum, const sol::optional<bool> mult, sol::this_state L) { return ObjectPieceMatImpl<CFeature>(featureID, pieceNum, mult.value_or(true), L); }
+	bool FeatureMatrix(const unsigned int featureID, const sol::optional<bool> mult, sol::this_state L) { return ObjectMatImpl<CFeature>(featureID, mult.value_or(objectMultDefault), L); }
+	bool FeaturePieceMatrix(const unsigned int featureID, const unsigned int pieceNum, const sol::optional<bool> mult, sol::this_state L) { return ObjectPieceMatImpl<CFeature>(featureID, pieceNum, mult.value_or(objectMultDefault), L); }
+
+	bool ProjectileMatrix(const unsigned int projID, const sol::optional<bool> mult, sol::this_state L) { return ObjectMatImpl<CFeature>(projID, mult.value_or(objectMultDefault), L); }
+	bool ProjectilePieceMatrix(const unsigned int projID, const unsigned int pieceNum, const sol::optional<bool> mult, sol::this_state L) { return ObjectPieceMatImpl<CFeature>(projID, pieceNum, mult.value_or(objectMultDefault), L); } //does this exist at all?
 
 	void ScreenViewMatrix(const sol::optional<bool> mult);
 	void ScreenProjMatrix(const sol::optional<bool> mult);
@@ -149,7 +152,7 @@ private:
 	inline void AssignOrMultMatImpl(const sol::optional<bool> mult, const bool multDefault, const TFunc& tfunc);
 
 	template<typename TObj>
-	inline const TObj* GetObjectImpl(const unsigned int objID, sol::this_state L);
+	inline static const TObj* ParseObject(int objID, sol::this_state L);
 
 	template<typename TObj>
 	inline bool GetObjectMatImpl(const unsigned int objID, CMatrix44f& outMat, sol::this_state L);
@@ -161,16 +164,17 @@ private:
 	template <typename  TObj>
 	bool ObjectPieceMatImpl(const unsigned int objID, const unsigned int pieceNum, bool mult, sol::this_state L);
 
-	static void CondSetupScreenMatrices();
+	template <typename  TObj>
+	inline static bool IsObjectVisible(const TObj* obj, sol::this_state L);
+
 private:
-	inline static bool IsFeatureVisible(const CFeature* feature, sol::this_state L);
-	inline static bool IsUnitVisible(const CUnit* feature, sol::this_state L);
-	inline static CUnit* ParseUnit(int unitID, sol::this_state L);
-	inline static CFeature* ParseFeature(int featureID, sol::this_state L);
+	static void CondSetupScreenMatrices();
+
 	inline static const LocalModelPiece* ParseObjectConstLocalModelPiece(const CSolidObject* obj, const unsigned int pieceNum);
 	//static methods
 private:
 	static constexpr bool viewProjMultDefault = false;
+	static constexpr bool objectMultDefault = true;
 	//static constants
 private:
 	CMatrix44f mat;

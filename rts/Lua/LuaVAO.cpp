@@ -27,12 +27,12 @@ inline LuaVAOImpl::LuaVAOImpl(const sol::optional<bool> freqUpdatedOpt) :
 	instAttribsSizeInBytes(0),
 	indElemSizeInBytes(0)
 {
-	LOG("LuaVAOImpl()");
+	//LOG("LuaVAOImpl()");
 }
 
 inline LuaVAOImpl::~LuaVAOImpl()
 {
-	LOG("~LuaVAOImpl()");
+	//LOG("~LuaVAOImpl()");
 
 	if (vao) delete vao;
 
