@@ -31,7 +31,7 @@ struct VAOAttrib {
 class LuaVAOImpl {
 public:
 	LuaVAOImpl() = delete;
-	LuaVAOImpl(const sol::optional<bool> freqUpdatedOpt);
+	LuaVAOImpl(const sol::optional<bool> freqUpdatedOpt, sol::this_state L);
 
 	LuaVAOImpl(const LuaVAOImpl& lva) = delete; //no copy cons
 	LuaVAOImpl(LuaVAOImpl&& lva) = default; //move cons
@@ -62,6 +62,9 @@ private:
 	bool FillAttribsNumberImpl(const int numFloatAttribs, const int divisor);
 	void FillAttribsImpl(const sol::object& attrDefTable, const int divisor, int* attribsSizeInBytes);
 private:
+	template <typename... Args>
+	void LuaError(std::string format, Args... args) { luaL_error(L, format.c_str(), args...); };
+private:
 	template <typename  TIn, typename  TOut>
 	static TOut TransformFunc(const TIn input);
 
@@ -71,6 +74,8 @@ private:
 	static constexpr int glMaxNumOfAttributes = 16;
 	static constexpr GLenum defaultVertexType = GL_FLOAT;
 	static constexpr GLenum defaultIndexType = GL_UNSIGNED_SHORT;
+private:
+	sol::this_state L;
 private:
 	int numAttributes;
 

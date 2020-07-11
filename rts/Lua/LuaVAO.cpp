@@ -9,7 +9,9 @@
 
 #include "LuaUtils.h"
 
-inline LuaVAOImpl::LuaVAOImpl(const sol::optional<bool> freqUpdatedOpt) :
+inline LuaVAOImpl::LuaVAOImpl(const sol::optional<bool> freqUpdatedOpt, sol::this_state L) :
+	L(L),
+
 	freqUpdated(freqUpdatedOpt.value_or(false)),
 
 	vao(nullptr),
@@ -140,9 +142,10 @@ bool LuaVAOImpl::FillAttribsNumberImpl(const int numFloatAttribs, const int divi
 	if (numFloatAttribs <= 0)
 		return false;
 
-	if (numFloatAttribs % 4 != 0)
-		//throw std::runtime_error("FillAttribsNumberImpl failure");
+	if (numFloatAttribs % 4 != 0) {
+		LuaError("Blabla");
 		return false;
+	}
 
 	bool atLeastOne = false;
 
@@ -681,7 +684,7 @@ bool LuaVAO::PushEntries(lua_State* L)
 	auto gl = sol::stack::get<sol::table>(L, -1);
 
 	gl.new_usertype<LuaVAOImpl>("VAO",
-		sol::constructors<LuaVAOImpl(const sol::optional<bool>)>(),
+		sol::constructors<LuaVAOImpl(const sol::optional<bool>, sol::this_state)>(),
 		"SetVertexAttributes", &LuaVAOImpl::SetVertexAttributes,
 		"SetInstanceAttributes", &LuaVAOImpl::SetInstanceAttributes,
 		"SetIndexAttributes", &LuaVAOImpl::SetIndexAttributes,
@@ -706,7 +709,7 @@ bool LuaVAO::PushEntries(lua_State* L)
 int LuaVAO::GetVAO(lua_State* L)
 {
 	return sol::stack::call_lua(L, 1, [=](const sol::optional<bool> freqUpdatedOpt) {
-		return std::move(LuaVAOImpl{ freqUpdatedOpt.value_or(false) });
+		return std::move(LuaVAOImpl{ freqUpdatedOpt, L });
 	});
 	//LuaVAOImpl lvp{};
 	//return sol::stack::push(L, std::move(lvp));
