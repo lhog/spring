@@ -193,18 +193,6 @@ class LuaOpenGL {
 		static int Clear(lua_State* L);
 		static int SwapBuffers(lua_State* L);
 
-		static int CreateVertexArray(lua_State* L);
-		static int DeleteVertexArray(lua_State* L);
-		static int UpdateVertexArray(lua_State* L);
-		static int RenderVertexArray(lua_State* L);
-
-		static int BeginEndD(lua_State* L);
-		static int VertexD(lua_State* L);
-		static int VertexIndicesD(lua_State* L);
-		static int NormalD(lua_State* L);
-		static int TexCoordD(lua_State* L);
-		static int ColorD(lua_State* L);
-
 		static int Lighting(lua_State* L);
 		static int ShadeModel(lua_State* L);
 		static int Scissor(lua_State* L);
