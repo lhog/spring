@@ -4,6 +4,7 @@
 #define LUA_GL_H
 
 #include <vector>
+#include <string>
 #include <unordered_set>
 
 #include "Rendering/GL/myGL.h"
@@ -146,7 +147,7 @@ class LuaOpenGL {
 		static void (*resetMatrixFunc)(void);
 		static unsigned int resetStateList;
 
-		static std::unordered_set<string> deprecatedGLWarned;
+		static std::unordered_set<std::string> deprecatedGLWarned;
 
 		struct OcclusionQuery {
 			unsigned int index; // into LuaOpenGL::occlusionQueries

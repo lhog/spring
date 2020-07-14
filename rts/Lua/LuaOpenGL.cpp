@@ -10,7 +10,6 @@
 
 //#include "Rendering/GL/myGL.h"
 
-#include <string>
 #include <vector>
 #include <algorithm>
 #include <optional>
@@ -103,7 +102,7 @@ bool  LuaOpenGL::safeMode = true;
 bool  LuaOpenGL::canUseShaders = false;
 int  LuaOpenGL::deprecatedGLWarnLevel = 0;
 
-std::unordered_set<string> LuaOpenGL::deprecatedGLWarned = {};
+std::unordered_set<std::string> LuaOpenGL::deprecatedGLWarned = {};
 
 float LuaOpenGL::screenWidth = 0.36f; // screen width (meters)
 float LuaOpenGL::screenDistance = 0.60f; // eye-to-screen (meters)
@@ -1542,6 +1541,7 @@ int LuaOpenGL::UnitShapeTextures(lua_State* L)
 int LuaOpenGL::UnitMultMatrix(lua_State* L)
 {
 	CheckDrawingEnabled(L, __func__);
+	CondWarnDeprecatedGL(L, __func__);
 
 	const CUnit* unit = ParseUnit(L, __func__, 1);
 
@@ -1562,6 +1562,7 @@ int LuaOpenGL::UnitPieceMatrix(lua_State* L) { return (UnitPieceMultMatrix(L)); 
 int LuaOpenGL::UnitPieceMultMatrix(lua_State* L)
 {
 	CheckDrawingEnabled(L, __func__);
+	CondWarnDeprecatedGL(L, __func__);
 	GLObjectPieceMultMatrix(L, ParseUnit(L, __func__, 1));
 	return 0;
 }
@@ -1646,6 +1647,7 @@ int LuaOpenGL::FeatureShapeTextures(lua_State* L)
 int LuaOpenGL::FeatureMultMatrix(lua_State* L)
 {
 	CheckDrawingEnabled(L, __func__);
+	CondWarnDeprecatedGL(L, __func__);
 
 	const CFeature* feature = ParseFeature(L, __func__, 1);
 
@@ -1667,6 +1669,7 @@ int LuaOpenGL::FeaturePieceMatrix(lua_State* L) { return (FeaturePieceMultMatrix
 int LuaOpenGL::FeaturePieceMultMatrix(lua_State* L)
 {
 	CheckDrawingEnabled(L, __func__);
+	CondWarnDeprecatedGL(L, __func__);
 	GLObjectPieceMultMatrix(L, ParseFeature(L, __func__, 1));
 	return 0;
 }
@@ -3937,6 +3940,7 @@ int LuaOpenGL::ColorD(lua_State* L)
 int LuaOpenGL::Translate(lua_State* L)
 {
 	CheckDrawingEnabled(L, __func__);
+	CondWarnDeprecatedGL(L, __func__);
 	const float x = luaL_checkfloat(L, 1);
 	const float y = luaL_checkfloat(L, 2);
 	const float z = luaL_checkfloat(L, 3);
@@ -3948,6 +3952,7 @@ int LuaOpenGL::Translate(lua_State* L)
 int LuaOpenGL::Scale(lua_State* L)
 {
 	CheckDrawingEnabled(L, __func__);
+	CondWarnDeprecatedGL(L, __func__);
 	const float x = luaL_checkfloat(L, 1);
 	const float y = luaL_checkfloat(L, 2);
 	const float z = luaL_checkfloat(L, 3);
@@ -3959,6 +3964,7 @@ int LuaOpenGL::Scale(lua_State* L)
 int LuaOpenGL::Rotate(lua_State* L)
 {
 	CheckDrawingEnabled(L, __func__);
+	CondWarnDeprecatedGL(L, __func__);
 	const float r = luaL_checkfloat(L, 1);
 	const float x = luaL_checkfloat(L, 2);
 	const float y = luaL_checkfloat(L, 3);
@@ -3971,6 +3977,7 @@ int LuaOpenGL::Rotate(lua_State* L)
 int LuaOpenGL::Ortho(lua_State* L)
 {
 	CheckDrawingEnabled(L, __func__);
+	CondWarnDeprecatedGL(L, __func__);
 	const float left   = luaL_checknumber(L, 1);
 	const float right  = luaL_checknumber(L, 2);
 	const float bottom = luaL_checknumber(L, 3);
@@ -3985,6 +3992,7 @@ int LuaOpenGL::Ortho(lua_State* L)
 int LuaOpenGL::Frustum(lua_State* L)
 {
 	CheckDrawingEnabled(L, __func__);
+	CondWarnDeprecatedGL(L, __func__);
 	const float left   = luaL_checknumber(L, 1);
 	const float right  = luaL_checknumber(L, 2);
 	const float bottom = luaL_checknumber(L, 3);
@@ -3999,6 +4007,7 @@ int LuaOpenGL::Frustum(lua_State* L)
 int LuaOpenGL::Billboard(lua_State* L)
 {
 	CheckDrawingEnabled(L, __func__);
+	CondWarnDeprecatedGL(L, __func__);
 	glMultMatrixf(camera->GetBillBoardMatrix());
 	return 0;
 }
@@ -4091,6 +4100,7 @@ int LuaOpenGL::ClipPlane(lua_State* L)
 int LuaOpenGL::MatrixMode(lua_State* L)
 {
 	CheckDrawingEnabled(L, __func__);
+	CondWarnDeprecatedGL(L, __func__);
 	GLenum mode = (GLenum)luaL_checkint(L, 1);
 	if (!GetLuaContextData(L)->glMatrixTracker.SetMatrixMode(mode))
 		luaL_error(L, "Incorrect value to gl.MatrixMode");
@@ -4102,6 +4112,7 @@ int LuaOpenGL::MatrixMode(lua_State* L)
 int LuaOpenGL::LoadIdentity(lua_State* L)
 {
 	CheckDrawingEnabled(L, __func__);
+	CondWarnDeprecatedGL(L, __func__);
 
 	const int args = lua_gettop(L); // number of arguments
 	if (args != 0) {
@@ -4115,6 +4126,7 @@ int LuaOpenGL::LoadIdentity(lua_State* L)
 int LuaOpenGL::LoadMatrix(lua_State* L)
 {
 	CheckDrawingEnabled(L, __func__);
+	CondWarnDeprecatedGL(L, __func__);
 
 	const int luaType = lua_type(L, 1);
 	if (luaType == LUA_TSTRING) {
@@ -4146,6 +4158,7 @@ int LuaOpenGL::LoadMatrix(lua_State* L)
 int LuaOpenGL::MultMatrix(lua_State* L)
 {
 	CheckDrawingEnabled(L, __func__);
+	CondWarnDeprecatedGL(L, __func__);
 
 	const int luaType = lua_type(L, 1);
 	if (luaType == LUA_TSTRING) {
@@ -4177,6 +4190,7 @@ int LuaOpenGL::MultMatrix(lua_State* L)
 int LuaOpenGL::PushMatrix(lua_State* L)
 {
 	CheckDrawingEnabled(L, __func__);
+	CondWarnDeprecatedGL(L, __func__);
 
 	const int args = lua_gettop(L); // number of arguments
 	if (args != 0) {
@@ -4194,6 +4208,7 @@ int LuaOpenGL::PushMatrix(lua_State* L)
 int LuaOpenGL::PopMatrix(lua_State* L)
 {
 	CheckDrawingEnabled(L, __func__);
+	CondWarnDeprecatedGL(L, __func__);
 
 	const int args = lua_gettop(L); // number of arguments
 	if (args != 0) {
@@ -4211,6 +4226,7 @@ int LuaOpenGL::PopMatrix(lua_State* L)
 int LuaOpenGL::PushPopMatrix(lua_State* L)
 {
 	CheckDrawingEnabled(L, __func__);
+	CondWarnDeprecatedGL(L, __func__);
 
 	std::vector<GLenum> matModes;
 	int arg;
@@ -4257,6 +4273,7 @@ int LuaOpenGL::PushPopMatrix(lua_State* L)
 int LuaOpenGL::GetMatrixData(lua_State* L)
 {
 	const int luaType = lua_type(L, 1);
+	CondWarnDeprecatedGL(L, __func__);
 
 	if (luaType == LUA_TNUMBER) {
 		const GLenum type = (GLenum)lua_tonumber(L, 1);
